@@ -57,7 +57,7 @@ const TrainerPage = () => {
           {tx("Ainda não há ficha. Ela nasce do save de", "No card yet. It comes from the save of")}{" "}
           <strong>Emerald</strong>, <strong>FireRed/LeafGreen</strong>{" "}
           {tx("ou", "or")} <strong>Ruby/Sapphire</strong>{" "}
-          {tx("aberto em", "opened in")} <Link to="/">{tx("Jogar", "Play")}</Link>.
+          {tx("aberto em", "opened in")} <Link to="/">{tx("Emulador", "Emulator")}</Link>.
         </p>
       </div>
     );

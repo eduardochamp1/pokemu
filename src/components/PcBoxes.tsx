@@ -188,8 +188,8 @@ const PcMonDetail = ({ entry, boxName, slug, nameOf, onClose }: DetailProps) => 
       {!isFullBoxMon(mon) ? (
         <p className="trainer-sub">
           {t(
-            "A ficha completa aparece depois que o jogo salvar de novo em Jogar.",
-            "Full details show up after the game saves again in Play."
+            "A ficha completa aparece depois que o jogo salvar de novo no emulador.",
+            "Full details show up after the game saves again in the emulator."
           )}
         </p>
       ) : membro ? (

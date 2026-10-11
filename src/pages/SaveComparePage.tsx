@@ -86,8 +86,8 @@ const SaveComparePage = () => {
       {!cmp ? (
         <p className="trainer-vazio">
           {t(
-            "Escolha dois saves: as fichas que o site já leu em Jogar, ou um arquivo .sav de Gen 3 (o seu de outro jogo, o de um amigo).",
-            "Pick two saves: the cards the site already read in Play, or a Gen 3 .sav file (yours from another game, a friend's)."
+            "Escolha dois saves: as fichas que o site já leu no emulador, ou um arquivo .sav de Gen 3 (o seu de outro jogo, o de um amigo).",
+            "Pick two saves: the cards the site already read in the emulator, or a Gen 3 .sav file (yours from another game, a friend's)."
           )}
         </p>
       ) : (

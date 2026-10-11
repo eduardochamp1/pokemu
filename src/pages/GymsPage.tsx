@@ -94,7 +94,7 @@ const GymsPage = () => {
         )}{" "}
         {meuTime.length === 0 && (
           <>
-            {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Jogar", "Play")}</Link>,{" "}
+            {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Emulador", "Emulator")}</Link>,{" "}
             {t("o seu time aparece contra cada líder.", "your team shows up against each leader.")}
           </>
         )}

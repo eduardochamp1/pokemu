@@ -16,7 +16,7 @@ const Navbar = () => {
     <nav className="navbar">
       <Link to="/" aria-label={t("Ir para o emulador", "Go to the emulator")} className="navbar-brand">
         <span className="navbar-pokeball" aria-hidden="true" />
-        <span className="navbar-title">{t("Jogar", "Play")}</span>
+        <span className="navbar-title">Pokemu</span>
       </Link>
       <div className="nav-links">
         <NavLink to="/" end className={classe}>

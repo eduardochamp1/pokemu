@@ -1,6 +1,6 @@
 {
-  "short_name": "Jogar",
-  "name": "Jogar — emulador GB, GBC e GBA",
+  "short_name": "Pokemu",
+  "name": "Pokemu — emulador GB, GBC e GBA",
   "description": "Emulador de Game Boy, Game Boy Color e GBA no navegador, com a ficha do treinador lida do seu save.",
   "lang": "pt-BR",
   "icons": [

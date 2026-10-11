@@ -1,4 +1,4 @@
-# Jogar
+# Pokemu
 
 Emulador de Game Boy, Game Boy Color e Game Boy Advance no navegador, com as
 suas ROMs — e tudo o que dá para ler do save: a ficha do treinador, o time, o
