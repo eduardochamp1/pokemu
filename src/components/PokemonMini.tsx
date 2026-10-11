@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import PokedexLink from "./PokedexLink";
 import { pixelSpriteUrl } from "../lib/sprites";
 import "../styles/pokemonMini.css";
 
@@ -8,7 +8,7 @@ interface Props {
   id: number;
   label: string;
   sub?: string;
-  /** Slug da PokéAPI; com ele o mini vira link para a ficha. */
+  /** Slug da PokéAPI; com ele o mini vira link para a ficha, na Pokédex. */
   slug?: string;
   /** Em vez de link, um botão que seleciona (o PC abre a ficha embaixo). */
   onSelect?: () => void;
@@ -46,9 +46,9 @@ const PokemonMini = ({ id, label, sub, slug, onSelect, selected }: Props) => {
     );
   }
   return slug ? (
-    <Link to={`/pokemon/${slug}`} className="poke-mini">
+    <PokedexLink to={`/pokemon/${slug}`} className="poke-mini">
       {conteudo}
-    </Link>
+    </PokedexLink>
   ) : (
     <span className="poke-mini">{conteudo}</span>
   );

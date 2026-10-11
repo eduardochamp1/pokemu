@@ -1,36 +1,19 @@
-import { useContext, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { flushSync } from "react-dom";
-import FavoriteContext from "../contexts/favoritesContext";
+import { useRef } from "react";
 import { useTiltEffect } from "../hooks/useTiltEffect";
-import { add as addToComparator } from "../lib/comparatorStore";
 import { displayName } from "../api";
 import { LEGENDARY, MYTHICAL } from "../data/rarity";
 import { tType } from "../data/i18n";
-import { preloadDetailPage } from "../pages/routeModules";
 import type { Pokemon } from "../types/pokemon";
-import type { DexMark } from "../lib/playerDex";
 import { useT } from "../i18n/lang";
-
-const DEX_MARK_LABEL: Record<DexMark, [string, string]> = {
-  owned: ["Capturado no seu jogo", "Caught in your game"],
-  seen: ["Visto no seu jogo", "Seen in your game"],
-};
-
-/** A API de transicao ainda nao esta na lib DOM de todo TypeScript. */
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (update: () => void) => { finished: Promise<void> };
-};
+import PokedexLink from "./PokedexLink";
 
 interface Props {
   pokemon: Pokemon;
   variant?: "grid" | "mini";
+  /** Caminho da ficha na Pokédex, que é outro site (ver PokedexLink). */
   linkTo?: string;
-  showActions?: boolean;
   /** Posicao na grade: atrasa a entrada de cada carta em cascata. */
   index?: number;
-  /** O que a dex do jogo lido do save diz deste pokemon. */
-  dexMark?: DexMark;
 }
 
 const STAT_ORDER = ["hp", "attack", "defense"] as const;
@@ -44,49 +27,12 @@ const Card = ({
   pokemon,
   variant = "grid",
   linkTo,
-  showActions = true,
   index = 0,
-  dexMark,
 }: Props) => {
-  const { favoritePokemons, updateFavoritePokemons } = useContext(FavoriteContext);
   const t = useT();
   const cardRef = useRef<HTMLDivElement>(null);
   useTiltEffect(cardRef, { maxDeg: variant === "mini" ? 4 : 8 });
 
-  const navigate = useNavigate();
-
-  // A carta clicada vira o hero da ficha. So a variante da grade entra
-  // nisso: no detalhe ja existe um hero com esse mesmo nome, e dois
-  // elementos com o mesmo view-transition-name cancelam a transicao.
-  //
-  // A transicao e disparada na mao porque o app monta o BrowserRouter
-  // classico, e o `viewTransition` do react-router exige data router.
-  const flipToDetail = (e: React.MouseEvent) => {
-    if (variant !== "grid" || !linkTo) return;
-    // Ctrl/Cmd/Shift e o botao do meio continuam abrindo em outra aba.
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-
-    const el = cardRef.current;
-    const start = (document as ViewTransitionDocument).startViewTransition;
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // Sem suporte, sem elemento ou com movimento reduzido: o Link navega
-    // do jeito normal.
-    if (!el || !start || still) return;
-
-    e.preventDefault();
-    void preloadDetailPage().then(() => {
-      el.style.viewTransitionName = "card-flip";
-      const transition = start.call(document, () => {
-        // Sem o flushSync o retrato novo sai antes do React commitar.
-        flushSync(() => navigate(linkTo));
-      });
-      void transition.finished.finally(() => {
-        el.style.viewTransitionName = "";
-      });
-    });
-  };
-
-  const isFavorite = favoritePokemons.includes(pokemon.name);
   const isLegendary = LEGENDARY.includes(pokemon.name);
   const isMythical = MYTHICAL.includes(pokemon.name);
   const primaryType = pokemon.types[0]?.type.name ?? "normal";
@@ -115,24 +61,6 @@ const Card = ({
               />
             ))}
           </div>
-          {showActions && (
-            <button
-              type="button"
-              className="card-fav"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                updateFavoritePokemons(pokemon.name);
-              }}
-              aria-label={
-                isFavorite
-                  ? t(`Remover ${pokemon.name} dos favoritos`, `Remove ${pokemon.name} from favorites`)
-                  : t(`Favoritar ${pokemon.name}`, `Add ${pokemon.name} to favorites`)
-              }
-            >
-              {isFavorite ? "♥" : "♡"}
-            </button>
-          )}
         </div>
       </div>
       <div className="card-artwork">
@@ -174,25 +102,6 @@ const Card = ({
           </ul>
         )}
       </div>
-      {showActions && (
-        <button
-          type="button"
-          className="card-compare"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            addToComparator({
-              name: pokemon.name,
-              height: pokemon.height,
-              sprite: artwork,
-            });
-          }}
-          aria-label={t(`Adicionar ${pokemon.name} ao comparador`, `Add ${pokemon.name} to the size comparison`)}
-          title={t("Adicionar ao comparador", "Add to the size comparison")}
-        >
-          📏
-        </button>
-      )}
       {/* Simbolo de raridade no canto, como na carta: le-se sem depender de cor. */}
       {isLegendary && !isMythical && (
         <span className="card-badge" title={t("Lendário", "Legendary")} aria-hidden="true">
@@ -208,15 +117,6 @@ const Card = ({
           ✦
         </span>
       )}
-      {/* Do save: pokebola cheia se capturou, so o contorno se viu. */}
-      {dexMark && (
-        <span
-          className={`card-dexmark card-dexmark-${dexMark}`}
-          role="img"
-          aria-label={t(...DEX_MARK_LABEL[dexMark])}
-          title={t(...DEX_MARK_LABEL[dexMark])}
-        />
-      )}
     </>
   );
 
@@ -224,8 +124,7 @@ const Card = ({
     "card" +
     ` card-${variant}` +
     (isLegendary ? " is-legendary" : "") +
-    (isMythical ? " is-mythical" : "") +
-    (isFavorite ? " is-favorite" : "");
+    (isMythical ? " is-mythical" : "");
 
   return (
     <div
@@ -241,9 +140,9 @@ const Card = ({
       <div className="card-spectral" aria-hidden="true" />
       <div className="card-glitter" aria-hidden="true" />
       {linkTo ? (
-        <Link to={linkTo} className="card-link" onClick={flipToDetail}>
+        <PokedexLink to={linkTo} className="card-link">
           {inner}
-        </Link>
+        </PokedexLink>
       ) : (
         inner
       )}

@@ -1,6 +1,6 @@
 {
-  "name": "reactdex",
-  "version": "0.2.0",
+  "name": "jogar",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,8 +14,6 @@
     "test:watch": "vitest",
     "bench": "node scripts/bench-emulador.mjs",
     "sprites": "node scripts/fetch-sprites.mjs",
-    "names:check": "node scripts/check-names.mjs",
-    "wiki:check": "node scripts/check-wiki.mjs",
     "gen3:species": "node scripts/gen3-species.mjs",
     "gen3:save-check": "node scripts/gen3-save-check.mjs"
   },

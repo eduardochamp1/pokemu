@@ -82,7 +82,7 @@ export const InstallButton = () => {
         adiado = null;
         ouvintes.forEach((l) => l());
       }}
-      title={t("Instalar a Pokédex como app", "Install the Pokédex as an app")}
+      title={t("Instalar como app", "Install as an app")}
     >
       {t("Instalar", "Install")}
     </button>

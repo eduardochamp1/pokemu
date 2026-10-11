@@ -1,7 +1,7 @@
 {
-  "short_name": "Pokédex",
-  "name": "Pokédex — lore, mapa e emulador",
-  "description": "Pokédex completa em React com lore do universo, mapa-múndi e emulador GB/GBC/GBA.",
+  "short_name": "Jogar",
+  "name": "Jogar — emulador GB, GBC e GBA",
+  "description": "Emulador de Game Boy, Game Boy Color e GBA no navegador, com a ficha do treinador lida do seu save.",
   "lang": "pt-BR",
   "icons": [
     {
@@ -29,24 +29,19 @@
   "background_color": "#0b0e13",
   "shortcuts": [
     {
-      "name": "Jogar",
-      "url": "/jogar",
-      "description": "Emulador GB, GBC e GBA"
-    },
-    {
-      "name": "Quiz",
-      "url": "/quiz",
-      "description": "Quem é esse Pokémon?"
-    },
-    {
-      "name": "Time",
-      "url": "/time",
-      "description": "Montador de time"
-    },
-    {
       "name": "Treinador",
       "url": "/treinador",
       "description": "Ficha e linha do tempo do seu save"
+    },
+    {
+      "name": "Ginásios",
+      "url": "/ginasios",
+      "description": "Os líderes contra o seu time"
+    },
+    {
+      "name": "Dano",
+      "url": "/dano",
+      "description": "Calculadora de dano da Gen 3"
     }
   ]
 }

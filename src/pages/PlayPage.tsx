@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import "../styles/play.css";
 import { useEmulator } from "../emulator/useEmulator";
 import {
@@ -39,6 +39,8 @@ import { rewindSeconds } from "../emulator/capture";
 import { useDisplay } from "../emulator/useDisplay";
 import { formatBytes } from "../emulator/storage";
 import ScreenshotThumb from "../components/ScreenshotThumb";
+import PokedexLink from "../components/PokedexLink";
+import { temPokedex } from "../lib/pokedexSite";
 import PlayTeam from "../components/PlayTeam";
 import { localeOf, useLang, tr, type Lang } from "../i18n/lang";
 import { generationLabel } from "../i18n/common";
@@ -304,23 +306,22 @@ const PlayPage = () => {
                 ? `${emu.romId.console} · base: ${emu.romId.jogo} · ${generationLabel(emu.romId.geracao, lang)}`
                 : consoleOf(currentRom)}
             </span>
-            {/* A aba era uma ilha: 870 linhas sem um único Link, e só três
-                arquivos do site inteiro citavam /jogar. Estas três páginas já
-                existiam — faltava o vão do meio. */}
-            {emu.romId && (
+            {/* As três páginas ficam na Pokédex, que é outro site: sem o
+                endereço dela configurado, a barra nem aparece. */}
+            {emu.romId && temPokedex && (
               <nav className="play-now-links" aria-label={tx("Sobre este jogo", "About this game")}>
                 {/* "Geração III" é fato; "a dex de Emerald" seria aproximação:
                     FireRed e LeafGreen usam a dex de Kanto mas trazem espécies
                     de Johto no pós-jogo. */}
-                <Link to={`/?ger=${emu.romId.geracao}`}>
+                <PokedexLink to={`/?ger=${emu.romId.geracao}`}>
                   {en
                     ? `Generation ${romano(emu.romId.geracao)} Pokémon`
                     : `Pokémon da Geração ${romano(emu.romId.geracao)}`}
-                </Link>
-                <Link to={`/mapa?region=${emu.romId.regiaoId}`}>
+                </PokedexLink>
+                <PokedexLink to={`/mapa?region=${emu.romId.regiaoId}`}>
                   {nomeDaRegiao(emu.romId.regiaoId)} {tx("no mapa", "on the map")}
-                </Link>
-                <Link to="/lore?aba=generations">{tx("Geração na lore", "Generation in the lore")}</Link>
+                </PokedexLink>
+                <PokedexLink to="/lore?aba=generations">{tx("Geração na lore", "Generation in the lore")}</PokedexLink>
               </nav>
             )}
           </div>

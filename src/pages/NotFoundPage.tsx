@@ -38,17 +38,16 @@ const NotFoundPage = () => {
     <h1>{t("Esta rota não existe", "This route doesn't exist")}</h1>
     <p>
       {t(
-        "O endereço que você abriu não corresponde a nenhuma página da Pokédex.",
-        "The address you opened doesn't match any page of the Pokédex."
+        "O endereço que você abriu não corresponde a nenhuma página deste site.",
+        "The address you opened doesn't match any page of this site."
       )}
     </p>
     <div className="notfound-links">
       <Link to="/" className="notfound-cta">
-        {t("Ir para a Pokédex →", "Go to the Pokédex →")}
+        {t("Ir para o emulador →", "Go to the emulator →")}
       </Link>
-      <Link to="/lore">{t("Explorar a lore", "Explore the lore")}</Link>
-      <Link to="/mapa">{t("Ver o mapa", "See the map")}</Link>
-      <Link to="/jogar">{t("Jogar", "Play")}</Link>
+      <Link to="/treinador">{t("Treinador", "Trainer")}</Link>
+      <Link to="/ginasios">{t("Ginásios", "Gyms")}</Link>
     </div>
   </div>
   );

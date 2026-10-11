@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
+import PokedexLink from "../components/PokedexLink";
 import { useTrainerEntry } from "../lib/trainerLog";
 import {
   describeEvent,
@@ -56,7 +57,7 @@ const TrainerPage = () => {
           {tx("Ainda não há ficha. Ela nasce do save de", "No card yet. It comes from the save of")}{" "}
           <strong>Emerald</strong>, <strong>FireRed/LeafGreen</strong>{" "}
           {tx("ou", "or")} <strong>Ruby/Sapphire</strong>{" "}
-          {tx("aberto em", "opened in")} <Link to="/jogar">{tx("Jogar", "Play")}</Link>.
+          {tx("aberto em", "opened in")} <Link to="/">{tx("Jogar", "Play")}</Link>.
         </p>
       </div>
     );
@@ -75,7 +76,7 @@ const TrainerPage = () => {
       <header className="trainer-header">
         <h1>{tx("Treinador", "Trainer")}</h1>
         <span className="trainer-rom">
-          <Link to="/jogar">{entry.rom.replace(/\.[^.]+$/, "")}</Link> · {gameLabel(game)} ·{" "}
+          <Link to="/">{entry.rom.replace(/\.[^.]+$/, "")}</Link> · {gameLabel(game)} ·{" "}
           <Link to="/treinador/comparar">{tx("comparar saves", "compare saves")}</Link>
         </span>
       </header>
@@ -108,7 +109,7 @@ const TrainerPage = () => {
           <div>
             <dt>Pokédex</dt>
             <dd>
-              <Link to="/?meu=capturados">{entry.owned.length}</Link>
+              {entry.owned.length}
               <span className="trainer-de"> / {TOTAL_DA_DEX_GEN3}</span>
             </dd>
           </div>
@@ -181,14 +182,14 @@ const TrainerPage = () => {
             })}
           </ul>
           <p className="trainer-sub">
-            <Link to="/mapa?region=hoenn">{tx("Ver Hoenn no mapa →", "See Hoenn on the map →")}</Link>
+            <PokedexLink to="/mapa?region=hoenn">{tx("Ver Hoenn no mapa →", "See Hoenn on the map →")}</PokedexLink>
           </p>
         </section>
         ) : (
           <p className="trainer-sub">
-            <Link to={`/mapa?region=${regiao}`}>
+            <PokedexLink to={`/mapa?region=${regiao}`}>
               {regiao === "kanto" ? tx("Ver Kanto no mapa →", "See Kanto on the map →") : tx("Ver Hoenn no mapa →", "See Hoenn on the map →")}
-            </Link>
+            </PokedexLink>
           </p>
         )}
       </div>

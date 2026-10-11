@@ -27,9 +27,6 @@ const Resumo = ({ r }: { r: BackupSummary }) => {
   return (
     <ul className="dados-resumo">
       <li>
-        <strong>{r.favorites}</strong> {t("favoritos", "favorites")}
-      </li>
-      <li>
         <strong>{r.trainerCards}</strong> {t("fichas de treinador", "trainer cards")}
       </li>
       <li>

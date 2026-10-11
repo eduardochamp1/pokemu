@@ -362,7 +362,7 @@ const EditorDeLado = ({ titulo, sel, onChange, team, lado }: EditorProps) => {
       </div>
       {team.length === 0 && (
         <p className="trainer-sub">
-          {t("Com um save lido em", "With a save read in")} <Link to="/jogar">{t("Jogar", "Play")}</Link>,{" "}
+          {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Jogar", "Play")}</Link>,{" "}
           {t("o seu time entra aqui com os status exatos.", "your team shows up here with exact stats.")}
         </p>
       )}
