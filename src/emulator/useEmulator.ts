@@ -41,6 +41,8 @@ import { ROM_HEADER_BYTES, identifyRom, type RomId } from "./romId";
 import { parseGen3Save, type Gen3PartyMember } from "./saveParse/gen3";
 import { parseLegacySave, type LegacySave } from "./saveParse/legacy";
 import { recordLegacyAdventure } from "../lib/legacyAdventures";
+import { backfillIdentities, registerLoadedRom } from "./romRegistration";
+import type { RomSource } from "../lib/romIdentity";
 import { recordPlayerDex } from "../lib/playerDex";
 import { recordTrainerSave } from "../lib/trainerLog";
 import { getLang, tr } from "../i18n/lang";
@@ -203,6 +205,9 @@ const baseDaRom = new Map<
   { base?: string; versionGroupId?: string }
 >();
 
+/** O preenchimento do índice de identidade já rodou nesta sessão. */
+let identidadesPreenchidas = false;
+
 function baseDe(
   core: mGBAEmulator,
   fileName: string
@@ -327,6 +332,8 @@ export function useEmulator() {
   const [roms, setRoms] = useState<RomEntry[]>([]);
   /** null = pasta roms/ indisponível (produção); [] = pasta vazia. */
   const [localRoms, setLocalRoms] = useState<LocalRom[] | null>(null);
+  /** A primeira leitura da pasta já respondeu (com lista ou sem pasta). */
+  const [localRomsSettled, setLocalRomsSettled] = useState(false);
   const [saves, setSaves] = useState<string[]>([]);
   const [volume, setVolumeState] = useState(getVolume);
   const [notice, setNotice] = useState<string | null>(null);
@@ -408,6 +415,10 @@ export function useEmulator() {
    */
   const statusRef = useRef(status);
   statusRef.current = status;
+  // Mesmo motivo do statusRef: o playFile precisa da lista de agora, não da
+  // que existia quando o callback foi criado.
+  const localRomsRef = useRef(localRoms);
+  localRomsRef.current = localRoms;
 
   /**
    * Miniaturas já lidas, por (ROM, slot), com o mtime que as produziu.
@@ -524,6 +535,8 @@ export function useEmulator() {
       if (Array.isArray(list)) setLocalRoms(list as LocalRom[]);
     } catch {
       // Em producao o endpoint nao existe: seguimos so com o seletor.
+    } finally {
+      setLocalRomsSettled(true);
     }
   }, []);
 
@@ -705,7 +718,7 @@ export function useEmulator() {
   );
 
   const playFile = useCallback(
-    async (file: File) => {
+    async (file: File, source: RomSource = "upload") => {
       const core = coreRef.current;
       if (!core) return;
       if (!isSupportedRom(file.name)) {
@@ -753,10 +766,32 @@ export function useEmulator() {
         return;
       }
 
+      // Antes do loadGame: se este arquivo é um já conhecido com outro nome,
+      // o save de bateria precisa estar com o nome novo quando o core o
+      // procurar.
+      const nomeAntigo = await registerLoadedRom(
+        core,
+        flatName,
+        await flatFile.arrayBuffer(),
+        flatFile.size,
+        source,
+        localRomsRef.current?.map((r) => r.fileName) ?? null
+      );
+      if (nomeAntigo) await syncFs(core);
+
       const ok = core.loadGame(`${core.filePaths().gamePath}/${flatName}`);
       if (!ok) {
         falhaAoCarregar(anterior, tr(getLang(), `Não deu para carregar ${flatName}.`, `Couldn't load ${flatName}.`));
         return;
+      }
+      if (nomeAntigo) {
+        setNotice(
+          tr(
+            getLang(),
+            `${flatName} é o mesmo arquivo que ${nomeAntigo}: o save, os pontos de retorno e o diário vieram junto.`,
+            `${flatName} is the same file as ${nomeAntigo}: the save, the save states and the journal came along.`
+          )
+        );
       }
       // Volume E velocidade: a barra guardava 5x e o jogo novo entrava em 1x.
       core.setVolume(volume / 100);
@@ -906,6 +941,17 @@ export function useEmulator() {
   );
 
   /** Puxa uma ROM da pasta local roms/ e joga. */
+  // As ROMs que já estavam na biblioteca antes de existir o índice de
+  // identidade. Uma vez por sessão, e só depois de a pasta responder: sem a
+  // lista dela não dá para saber de onde cada arquivo veio.
+  const coreReady = status.kind === "ready" || status.kind === "running" || status.kind === "paused";
+  useEffect(() => {
+    const core = coreRef.current;
+    if (!coreReady || !localRomsSettled || !core || identidadesPreenchidas) return;
+    identidadesPreenchidas = true;
+    void backfillIdentities(core, localRomsRef.current?.map((r) => r.fileName) ?? null);
+  }, [coreReady, localRomsSettled]);
+
   const playLocal = useCallback(
     async (fileName: string) => {
       // Quem poe "loading" e o playFile: se fosse aqui, o status do jogo em
@@ -916,7 +962,7 @@ export function useEmulator() {
         const res = await fetch(`/local-roms/${encodeURIComponent(fileName)}`);
         if (!res.ok) throw new Error(`servidor respondeu ${res.status}`);
         const buffer = await res.arrayBuffer();
-        await playFile(new File([buffer], fileName));
+        await playFile(new File([buffer], fileName), "folder");
       } catch (error) {
         falhaAoCarregar(
           anterior,
