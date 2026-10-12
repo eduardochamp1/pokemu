@@ -37,17 +37,17 @@ via [mGBA](https://mgba.io) compilado para WebAssembly.
   arredondamento deixava uns pixels com 3 px de lado e outros com 4
 - **Sabe que jogo é** — o cabeçalho do cartucho é lido no carregamento e a tela
   diz "base: Emerald · Geração III" além do nome do arquivo
-- **Ligada ao resto do site** — com um jogo rodando, três links levam à dex
-  daquela geração, à região no mapa e à geração na lore
+- **Ligada à Pokédex** — com um jogo rodando, três links levam à dex daquela
+  geração, à região no mapa e à geração na lore, no site da Pokédex (ver
+  "Ligação com a Pokédex" abaixo)
 - **Galeria de capturas** por jogo, com miniatura, data, baixar de novo e
   apagar — antes o PNG ficava no FS para sempre e a cota crescia invisível
 - **Seu time, lido do save** — o save de bateria de Gen 3 é interpretado e o
-  time aparece com as **mesmas cartas** da Pokédex, com apelido e nível. É onde
-  o emulador deixa de ser ilha e vira fonte de dados do site
+  time aparece em cartas, com apelido e nível. É onde o emulador deixa de ser
+  ilha e vira fonte de dados do site
 - **Sua dex, lida do save** — os bits de visto e capturado (seção 0, `0x5C` e
   `0x28`, medidos num save real de Emerald) vão para o `localStorage` a cada
-  gravação, e a Pokédex da Home passa a saber o que você já pegou sem carregar
-  o core
+  gravação, e entram no backup de "Seus dados"
 - **Ficha de cada pokémon do time** — natureza (com o que sobe e desce), IVs,
   EVs, status, golpes com PP, amizade, shiny e a habilidade **de Gen 3** (o
   Gengar de Gen 3 tem Levitate, não Cursed Body). Os offsets foram medidos num
@@ -96,8 +96,8 @@ máquina, e um deploy acidental não os leva.
   resoluções. Com o `exclude`, o `import()` normal do pacote basta — é o que
   o **gbajs3** faz, e ele roda este mesmo core em produção.
 - **O core é carregado sob demanda** (`await import("@thenick775/mgba-wasm")`
-  dentro de `getCore`). São ~2 MB entre glue e wasm; quem abre a Pokédex para
-  ver um Pokémon não os baixa.
+  dentro de `getCore`). São ~2 MB entre glue e wasm; quem abre só o Treinador
+  ou os Ginásios não os baixa.
 - **O canvas e o core são singletons da sessão**, criados fora da árvore do
   React. O core é amarrado ao canvas na criação, então um canvas novo (StrictMode
   remonta em dev; navegar para fora e voltar remonta sempre) deixaria o core
@@ -135,8 +135,6 @@ máquina, e um deploy acidental não os leva.
 - **Save states usam `saveStateSlot`/`loadStateSlot`**, que a tipagem marca como
   *deprecated* — porque na mGBA-wasm 2.5.1 as recomendadas (`saveState`/`loadState`)
   retornam falso e não escrevem nada. Verificado no browser.
-- **O core é copiado por um plugin do Vite**, não por hook do npm: `npm start`
-  não tem `prestart`, então quem subisse por ali ficaria sem o core.
 - **Dentro do core o nome da ROM é sempre o basename.** O FS virtual é plano; um
   nome com subpasta (`gb/jogo.gb`) faz `uploadRom` escrever num diretório
   inexistente, a escrita falha e o callback nunca dispara — a tela ficava presa
@@ -230,7 +228,20 @@ leem time, Pokédex, PC e tempo de jogo, sem dinheiro nem insígnias.
   dinheiro só dá 3300 depois do XOR pela chave de segurança; as flags em volta
   das insígnias (tem Pokédex, visitou Littleroot e Oldale) batem com o começo
   do jogo. A ordem das insígnias é a da decompilação: no save medido nenhuma
-  estava ganha. Ruby/Sapphire e FR/LG ficam de fora — o layout deles é outro
+  estava ganha
+
+### Leitura de saves de Gen 1 e Gen 2
+
+Red, Blue, Yellow, Green japonês, Gold, Silver e Crystal da biblioteca agora
+têm leitores próprios de treinador, time, Pokédex e PC. Os dados aparecem no
+painel do jogo e em **Treinador**, e entram no backup de **Seus dados**.
+Gen 2 inclui recuperação da cópia de segurança quando o bloco principal não
+passa no checksum. DVs e experiência de status são preservados sem convertê-los
+em atributos de Gen 3. A calculadora de dano e o guia de ginásios continuam
+focados em Gen 3. Veja [compatibilidade e validação](docs/save-readers.md).
+
+Para conferir uma ROM e, opcionalmente, seu save de bateria:
+`npm run save:check -- "<rom>" "<save.sav>"`.
 
 ## 🛠️ Stack
 
@@ -240,6 +251,24 @@ leem time, Pokédex, PC e tempo de jogo, sem dinheiro nem insígnias.
 - **Vitest** para os testes, **ESLint** para o lint
 
 ## 🚀 Rodando localmente
+
+### Aplicativo Windows
+
+O Pokemu também roda em uma janela própria, usando Electron, sem precisar
+instalar Node.js no computador que receber o executável.
+
+- `npm run desktop`: compila e abre o aplicativo localmente.
+- `npm run desktop:pack`: gera `release/Pokemu-0.1.0-Windows.exe` (Windows x64).
+- `npm run desktop:test`: verifica o acesso aos arquivos e o backup do aplicativo.
+
+O executável pode ser aberto sem instalação. Os dados ficam em
+`%APPDATA%/Pokemu`, com biblioteca em `roms/` e backups em `saves/`.
+Use o menu **Pokemu → Abrir pasta de ROMs / Abrir pasta de saves** para acessá-los.
+As ROMs e os saves pessoais não entram no pacote. Para trazer o progresso do
+navegador, exporte o `.sav` e o JSON de **Seus dados** e importe no aplicativo.
+Os recursos que consultam a PokéAPI precisam de internet; o emulador usa o core
+incluído no executável. A distribuição gerada localmente não tem assinatura digital.
+
 
 ```bash
 npm install
@@ -283,8 +312,6 @@ Sem a variável os links viram texto e o resto funciona igual.
 
 ## 📝 Notas técnicas
 
-- **Imagens de personagens, regiões e organizações**: não vêm de wiki. O Bulbapedia bloqueia hotlink (`archives.bulbagarden.net` responde 403) e a arte é propriedade da Nintendo/Game Freak. Não existe retrato de treinador em fonte que o projeto possa usar: `PokeAPI/sprites` serve `pokemon`, `items`, `badges` e `types`, e nada de treinador. Então a ilustração dessas seções é SVG gerado no próprio projeto (`LoreArt.tsx`), e a wiki entra como **fonte citada**.
-- **Emulador**: o core é carregado em runtime de `/emulator/mgba.js`, não pelo bundler — o runtime de threads do Emscripten sobe o worker de pthread a partir da URL do próprio script e resolve o `.wasm` relativo a ela. Por isso os dois arquivos são servidos lado a lado de `public/` (copiados de `node_modules` no `predev`/`prebuild`, e fora do git).
 - **Romhack tem o cabeçalho do jogo original, byte a byte**. Medido nas ROMs de
   `roms/`: `Pokemon Rocket` e `Pokemon Unbound` têm o bloco `0xA0..0xBF`
   idêntico ao de uma FireRed oficial — mesmo título, mesmo game code, mesmo
