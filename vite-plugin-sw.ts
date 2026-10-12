@@ -40,7 +40,7 @@ export function injectPrecache(source: string, files: string[], version: string)
 export function serviceWorkerPrecache(): Plugin {
   let outDir = "dist";
   return {
-    name: "pokedex-sw-precache",
+    name: "pokemu-sw-precache",
     apply: "build",
     configResolved(config) {
       outDir = resolve(config.root, config.build.outDir);

@@ -21,9 +21,9 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 16. Mapa de progresso
 - [x] 17. Ginásios, dano e comparação para Gen 1/2 — **parcial**, ver notas
 - [x] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana — **parcial**, ver notas
-- [ ] 19. CI no GitHub
-- [ ] 20. Renomear os caches `pokedex-*` do service worker sem perder dados
-- [ ] 21. Assinatura digital do `.exe` (depende de certificado: documentar o que falta)
+- [x] 19. CI no GitHub
+- [x] 20. Renomear os caches `pokedex-*` do service worker sem perder dados
+- [x] 21. Assinatura digital do `.exe` (depende de certificado: documentar o que falta)
 
 ## Notas por item
 
@@ -103,7 +103,27 @@ Ficou de fora, e por quê:
   das caixas são outros. Sem um save real (ou os offsets conferidos na
   referência, mais uma fixture) o leitor sairia sem como saber se está certo.
 
+### 19. CI
+
+- `.github/workflows/ci.yml`: typecheck, lint, testes, teste do desktop e
+  build a cada push e pull request no `main`. Só roda depois do primeiro push.
+
+### 20. Caches do service worker
+
+- Os caches passam de `pokedex-*` para `pokemu-*`. Na primeira ativação, os
+  sprites e as respostas da PokéAPI já guardados são copiados para os nomes
+  novos antes de os antigos serem apagados.
+- As chaves `pokedex:` do `localStorage` **não** foram renomeadas: é onde
+  estão o diário, as fichas e o histórico, e trocar o prefixo exigiria migrar
+  os dados de todo mundo sem ganho para quem usa.
+
+### 21. Assinatura do executável
+
+- Documentado em `docs/assinatura-windows.md`. Depende de um certificado.
+
 ## Dúvidas para o usuário
 
 - **Saves de Gen 1 e Gen 2 para validar.** Se você jogar e salvar em Red/Blue/Yellow e em Gold/Silver/Crystal, os arquivos aparecem em `saves/` e dá para conferir os leitores com `npm run save:check`.
+- **Certificado de assinatura de código** para o `.exe`: é uma compra ou contratação sua (ver `docs/assinatura-windows.md`).
+- **Push.** O loop commitou tudo no `main` local e não enviou nada ao GitHub. O CI só começa a rodar depois do push.
 - **Gen 2 japonesa e coreana:** você tem alguma dessas ROMs e quer o leitor? Sem ROM nem save não há como validar.

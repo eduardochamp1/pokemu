@@ -1,5 +1,5 @@
 /*
- * Service worker da Pokédex.
+ * Service worker do Pokemu.
  *
  * Escrito à mão de propósito: o projeto não tem dependência pesada nenhuma, e
  * o que precisamos aqui cabe em um arquivo — não vale trazer Workbox para isso.
@@ -19,10 +19,18 @@
 const VERSION = "__SW_VERSION__";
 const PRECACHE = /*__SW_PRECACHE__*/ [];
 
-const BUILD = `pokedex-build-${VERSION}`;
-const RUNTIME = "pokedex-runtime-v1";
-const API = "pokedex-api-v1";
+const BUILD = `pokemu-build-${VERSION}`;
+const RUNTIME = "pokemu-runtime-v1";
+const API = "pokemu-api-v1";
 const NOSSOS = [BUILD, RUNTIME, API];
+
+/**
+ * Os nomes de quando o projeto era uma aba da Pokédex. Quem já tinha o site
+ * instalado guardou sprites e respostas da PokéAPI sob eles: na primeira
+ * ativação com os nomes novos, o conteúdo é copiado antes de o cache antigo
+ * ser apagado — ninguém baixa de novo o que já tinha.
+ */
+const ANTIGOS = { "pokedex-runtime-v1": RUNTIME, "pokedex-api-v1": API };
 
 const SHELL_URL = "/index.html";
 
@@ -46,18 +54,42 @@ self.addEventListener("install", (event) => {
   );
 });
 
+/**
+ * Copia um cache de nome antigo para o novo. O que já existe no novo fica: é
+ * mais recente do que qualquer coisa guardada sob o nome antigo.
+ */
+async function migrar(antigo, novo) {
+  const origem = await caches.open(antigo);
+  const destino = await caches.open(novo);
+  for (const request of await origem.keys()) {
+    if (await destino.match(request)) continue;
+    const response = await origem.match(request);
+    if (response) await destino.put(request, response);
+  }
+}
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((names) =>
-        Promise.all(
-          names
-            .filter((name) => name.startsWith("pokedex-") && !NOSSOS.includes(name))
-            .map((name) => caches.delete(name))
-        )
-      )
-      .then(() => self.clients.claim())
+    (async () => {
+      const names = await caches.keys();
+      for (const [antigo, novo] of Object.entries(ANTIGOS)) {
+        if (!names.includes(antigo)) continue;
+        try {
+          await migrar(antigo, novo);
+        } catch {
+          // Cópia que falha no meio não pode impedir o worker de ativar: o
+          // que não veio é baixado de novo quando for pedido.
+        }
+      }
+      // Builds anteriores (com qualquer um dos dois prefixos) e os caches de
+      // nome antigo, que a esta altura já foram copiados.
+      await Promise.all(
+        names
+          .filter((name) => (name.startsWith("pokemu-") || name.startsWith("pokedex-")) && !NOSSOS.includes(name))
+          .map((name) => caches.delete(name))
+      );
+      await self.clients.claim();
+    })()
   );
 });
 

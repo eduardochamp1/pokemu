@@ -243,6 +243,41 @@ focados em Gen 3. Veja [compatibilidade e validação](docs/save-readers.md).
 Para conferir uma ROM e, opcionalmente, seu save de bateria:
 `npm run save:check -- "<rom>" "<save.sav>"`.
 
+### Companheiro de aventura
+
+O que o site faz com o que lê do save e com o que você anota. Tudo fica neste
+navegador; nada vai para servidor.
+
+- **Aventura ativa** — uma escolha só para Aventuras, Ginásios, Ajuda e
+  Planejar batalhas, mostrada na navbar. Carregar um jogo a define.
+- **Onde parei?** — o objetivo aberto há mais tempo, a última nota e o que o
+  save registrou na sessão mais recente. Não sabe a posição no jogo, e diz.
+- **Diário ilustrado** — notas, objetivos, capturas de tela e eventos do save
+  numa cronologia por dia.
+- **Dicas em três níveis** (`/ajuda`) — pista, próximo passo e solução para
+  cada insígnia de Emerald e FireRed/LeafGreen. Texto próprio.
+- **Laboratório do time** (`/dano`) — fraquezas que o time divide, tipos sem
+  cobertura e quem do PC ajudaria, com o motivo.
+- **Preparação para o próximo líder** (`/ginasios`) — diferença de nível,
+  pokémon sem resposta e atalhos que abrem a calculadora já montada. O guia
+  cobre também os oito líderes de Johto em Gold/Silver/Crystal.
+- **Álbum da jornada** — insígnias, evoluções e conquistas em cartões com PNG.
+- **Modo desafio** — regras, limite de nível, um encontro por área e perdas.
+  O site só confere o nível; o resto é registro seu.
+- **Mapa de progresso** — Hoenn em esquema com as cidades visitadas (Emerald)
+  e lugares que você marca.
+- **Cápsula da aventura** — save, pontos de retorno, capturas, diário e fichas
+  de um jogo num arquivo só, com prévia antes de restaurar.
+- **Ramificações** — a aventura inteira guardada com um nome, para testar
+  outro caminho e voltar.
+- **Renomear a ROM não perde a aventura** — o arquivo é reconhecido pelo
+  conteúdo (SHA-256) e os dados acompanham o nome novo.
+- **Sem rede** — o time, o dano e os ginásios usam um catálogo embarcado da
+  Gen 3 quando a PokéAPI não responde.
+
+A fila do que foi feito, com o que ficou de fora de cada item, está em
+[docs/fila-implementacao.md](docs/fila-implementacao.md).
+
 ## 🛠️ Stack
 
 - **React 19** + **TypeScript** estrito, **Vite** e **React Router**
@@ -267,7 +302,8 @@ Use o menu **Pokemu → Abrir pasta de ROMs / Abrir pasta de saves** para acess�
 As ROMs e os saves pessoais não entram no pacote. Para trazer o progresso do
 navegador, exporte o `.sav` e o JSON de **Seus dados** e importe no aplicativo.
 Os recursos que consultam a PokéAPI precisam de internet; o emulador usa o core
-incluído no executável. A distribuição gerada localmente não tem assinatura digital.
+incluído no executável. A distribuição gerada localmente não tem assinatura digital;
+o que falta para assinar está em [docs/assinatura-windows.md](docs/assinatura-windows.md).
 
 
 ```bash
@@ -301,6 +337,7 @@ Sem a variável os links viram texto e o resto funciona igual.
 | `npm run lint` / `npm run typecheck` | Lint e tipos |
 | `npm run bench` | Mede a velocidade do emulador em quadros emulados por segundo. Precisa do `npm run dev` de pé e do Chrome |
 | `npm run sprites` | Baixa os sprites para `public/sprites/` |
+| `npm run catalog` | Regera o catálogo offline da Gen 3 a partir da PokéAPI |
 | `npm run gen3:species <rom.gba>` | Regera a tabela de espécies da Gen 3 lendo a sua ROM |
 | `npm run gen3:save-check "<arquivo.sav>"` | Valida o leitor de save contra um `.sav` de verdade |
 
