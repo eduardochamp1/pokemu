@@ -85,11 +85,33 @@ const BAK = ".antes-da-capsula";
  * reservas voltam ao lugar: restaurar uma cápsula nunca deixa a aventura pior
  * do que estava. Só com tudo gravado as reservas são removidas.
  */
-export function writeRestore(fs: CapsuleFs, dirs: CapsuleDirs, rom: string, steps: readonly RestoreStep[]): number {
+export function writeRestore(
+  fs: CapsuleFs,
+  dirs: CapsuleDirs,
+  rom: string,
+  steps: readonly RestoreStep[],
+  /**
+   * Deixa a ROM só com o que o plano grava, tirando o que existe a mais. É o
+   * que trocar de ramificação precisa: um ponto de retorno da outra linha do
+   * tempo, deixado para trás, carregaria um jogo que não é o desta.
+   */
+  exact = false
+): number {
   const base = romBaseName(rom);
   const reservas: string[] = [];
   const escritos: string[] = [];
   try {
+    if (exact) {
+      const gravados = new Set(steps.filter((s) => s.action === "write").map((s) => s.file.suffix));
+      for (const suffix of existingSuffixes(fs, dirs, rom)) {
+        const tipo = tipoDe(suffix);
+        // Captura de tela é foto, não estado do jogo: fica em qualquer ramificação.
+        if (!tipo || tipo.kind === "screenshot" || gravados.has(suffix)) continue;
+        const path = `${dirs[tipo.dir]}/${base}${suffix}`;
+        fs.rename(path, path + BAK);
+        reservas.push(path);
+      }
+    }
     for (const step of steps) {
       if (step.action !== "write") continue;
       const tipo = tipoDe(step.file.suffix);

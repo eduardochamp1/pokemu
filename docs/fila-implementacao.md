@@ -17,7 +17,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 12. Guia com dicas em três níveis
 - [x] 13. Álbum da jornada
 - [x] 14. Modo desafio
-- [ ] 15. Ramificações de aventura
+- [x] 15. Ramificações de aventura
 - [ ] 16. Mapa de progresso
 - [ ] 17. Ginásios, dano e comparação para Gen 1/2
 - [ ] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana

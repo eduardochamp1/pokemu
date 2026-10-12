@@ -98,3 +98,29 @@ describe("writeRestore", () => {
     expect(estado(fs)).toEqual({ "/data/saves/Local.sav": [7, 7] });
   });
 });
+
+describe("writeRestore exato (troca de ramificação)", () => {
+  /** Um ponto de retorno da outra linha do tempo não pode sobrar. */
+  it("tira o que a ROM tem e a cápsula não traz", async () => {
+    const fs = fakeFs({
+      "/data/saves/Local.sav": [1],
+      "/data/states/Local.ss3": [3],
+      "/data/screenshots/Local.ss3.png": [4],
+      "/data/saves/Outro.sav": [5],
+    });
+    const plano = planRestore(await capsula(), existingSuffixes(fs, DIRS, "Local.gba"), "c");
+    writeRestore(fs, DIRS, "Local.gba", plano, true);
+    expect(estado(fs)).toEqual({
+      "/data/saves/Local.sav": [7, 7],
+      "/data/saves/Outro.sav": [5],
+      "/data/states/Local.ss1": [8],
+    });
+  });
+
+  it("falha no meio devolve também o que tinha sido tirado", async () => {
+    const fs = fakeFs({ "/data/saves/Local.sav": [1], "/data/states/Local.ss3": [3] }, "/data/states/Local.ss1");
+    const plano = planRestore(await capsula(), existingSuffixes(fs, DIRS, "Local.gba"), "c");
+    expect(() => writeRestore(fs, DIRS, "Local.gba", plano, true)).toThrow("cota");
+    expect(estado(fs)).toEqual({ "/data/saves/Local.sav": [1], "/data/states/Local.ss3": [3] });
+  });
+});

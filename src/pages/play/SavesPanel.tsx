@@ -5,6 +5,7 @@ import ScreenshotThumb from "../../components/ScreenshotThumb";
 import SlotName from "../../components/SlotName";
 import { localeOf } from "../../i18n/lang";
 import AdventureCapsule from "../../components/AdventureCapsule";
+import AdventureBranches from "../../components/AdventureBranches";
 import type { PlayState } from "./usePlayPage";
 
 export default function SavesPanel({ p }: { p: PlayState }) {
@@ -213,6 +214,11 @@ export default function SavesPanel({ p }: { p: PlayState }) {
           </section>
 
           <AdventureCapsule
+            roms={emu.roms.map((r) => r.fileName)}
+            currentRom={currentRom}
+            onRestored={() => emu.refreshLibrary()}
+          />
+          <AdventureBranches
             roms={emu.roms.map((r) => r.fileName)}
             currentRom={currentRom}
             onRestored={() => emu.refreshLibrary()}

@@ -1281,3 +1281,12 @@
   font-size: 0.8rem;
 }
 .capsule-preview ul { margin: 8px 0 12px 18px; display: grid; gap: 4px; color: var(--text-muted); }
+
+/* Ramificacoes: uma linha por ponto preservado, com o resumo para comparar. */
+.branch-list { list-style: none; display: grid; gap: 10px; margin-top: 12px; }
+.branch-list li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 6px; font-size: 0.8rem; }
+.branch-list strong { font-size: 0.88rem; }
+.branch-list small { color: var(--text-muted); line-height: 1.5; }
+.branch-new { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.branch-new label { display: grid; gap: 4px; flex: 1; min-width: 140px; font-size: 0.75rem; color: var(--text-muted); }
+.branch-new input { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; }

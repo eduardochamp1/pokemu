@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
+import { kv, resetMemoryStoresForTests } from "./idb";
 
 /**
  * O texto dos detonados, fora do `localStorage`.
@@ -13,39 +14,7 @@ import { useEffect, useSyncExternalStore } from "react";
  * pressão de disco — então o texto continua indo no backup de "Seus dados".
  */
 
-const DB_NAME = "pokemu";
-const STORE = "guides";
-
-/** Onde não há IndexedDB (testes, modo restrito) o texto vale só na sessão. */
-const memoria = new Map<string, string>();
-const temIdb = () => typeof indexedDB !== "undefined";
-
-function abrir(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function transacao<T>(
-  modo: IDBTransactionMode,
-  usar: (store: IDBObjectStore) => IDBRequest<T> | void
-): Promise<T | undefined> {
-  const db = await abrir();
-  try {
-    return await new Promise<T | undefined>((resolve, reject) => {
-      const tx = db.transaction(STORE, modo);
-      const req = usar(tx.objectStore(STORE));
-      tx.oncomplete = () => resolve(req ? req.result : undefined);
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error);
-    });
-  } finally {
-    db.close();
-  }
-}
+const store = kv<string>("guides");
 
 /**
  * O que já foi lido ou gravado nesta sessão. É o que deixa a tela mostrar o
@@ -56,9 +25,8 @@ const listeners = new Set<() => void>();
 const avisar = () => listeners.forEach((l) => l());
 
 export async function readGuideText(rom: string): Promise<string | null> {
-  const text = temIdb()
-    ? ((await transacao<string>("readonly", (s) => s.get(rom))) ?? null)
-    : (memoria.get(rom) ?? null);
+  const lido = await store.get(rom);
+  const text = typeof lido === "string" ? lido : null;
   cache.set(rom, text);
   avisar();
   return text;
@@ -66,15 +34,13 @@ export async function readGuideText(rom: string): Promise<string | null> {
 
 /** Rejeita se não couber: quem chama avisa, em vez de fingir que guardou. */
 export async function writeGuideText(rom: string, text: string): Promise<void> {
-  if (temIdb()) await transacao("readwrite", (s) => void s.put(text, rom));
-  else memoria.set(rom, text);
+  await store.put(rom, text);
   cache.set(rom, text);
   avisar();
 }
 
 export async function deleteGuideText(rom: string): Promise<void> {
-  if (temIdb()) await transacao("readwrite", (s) => void s.delete(rom));
-  else memoria.delete(rom);
+  await store.delete(rom);
   cache.set(rom, null);
   avisar();
 }
@@ -89,36 +55,13 @@ export async function renameGuideText(from: string, to: string): Promise<void> {
 
 /** Todos os guias, para o backup. */
 export async function allGuideTexts(): Promise<Record<string, string>> {
-  if (!temIdb()) return Object.fromEntries(memoria);
-  const db = await abrir();
-  try {
-    return await new Promise((resolve, reject) => {
-      const out: Record<string, string> = {};
-      const req = db.transaction(STORE, "readonly").objectStore(STORE).openCursor();
-      req.onsuccess = () => {
-        const cursor = req.result;
-        if (!cursor) return resolve(out);
-        if (typeof cursor.value === "string") out[String(cursor.key)] = cursor.value;
-        cursor.continue();
-      };
-      req.onerror = () => reject(req.error);
-    });
-  } finally {
-    db.close();
-  }
+  const tudo = await store.all();
+  return Object.fromEntries(Object.entries(tudo).filter(([, v]) => typeof v === "string"));
 }
 
 /** Troca tudo pelo que veio de um backup. */
 export async function replaceAllGuideTexts(guides: Record<string, string>): Promise<void> {
-  if (temIdb()) {
-    await transacao("readwrite", (s) => {
-      s.clear();
-      for (const [rom, text] of Object.entries(guides)) s.put(text, rom);
-    });
-  } else {
-    memoria.clear();
-    for (const [rom, text] of Object.entries(guides)) memoria.set(rom, text);
-  }
+  await store.replaceAll(guides);
   cache.clear();
   avisar();
 }
@@ -147,6 +90,6 @@ export function useGuideText(rom: string | undefined): string | null | undefined
 
 /** Só para os testes: zera o que ficou de um teste para o outro. */
 export function resetGuideStoreForTests(): void {
-  memoria.clear();
+  resetMemoryStoresForTests();
   cache.clear();
 }

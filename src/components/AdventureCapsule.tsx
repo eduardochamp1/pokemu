@@ -1,29 +1,14 @@
 import { useRef, useState } from "react";
-import { coreVersion, getCore, getLoadedRom } from "../emulator/core";
-import {
-  collectRomFiles,
-  existingSuffixes,
-  writeRestore,
-  type CapsuleFs,
-} from "../emulator/capsuleFs";
+import { getCore, getLoadedRom } from "../emulator/core";
+import { buildCapsule, planFor, restoreCapsule } from "../emulator/capsuleActions";
 import {
   MAX_CAPSULE_BYTES,
-  applyRomData,
   capsuleFileName,
-  collectRomData,
   parseCapsule,
-  planRestore,
   type Capsule,
   type RestoreStep,
 } from "../lib/capsule";
 import { loadRegistry } from "../lib/romIdentity";
-import { readGuideText, writeGuideText } from "../lib/guideStore";
-import { reloadPersonalAdventures } from "../lib/personalAdventures";
-import { reloadLegacyAdventures } from "../lib/legacyAdventures";
-import { reloadTrainerLog } from "../lib/trainerLog";
-import { reloadPlayerDex } from "../lib/playerDex";
-import { reloadSessions } from "../lib/sessions";
-import { reloadChallenges } from "../lib/challenge";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
 
@@ -65,20 +50,8 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
     setAviso(null);
     try {
       const core = await getCore();
-      const files = await collectRomFiles(core.FS as unknown as CapsuleFs, core.filePaths(), rom);
-      const identity = loadRegistry(localStorage)[rom];
-      const guide = await readGuideText(rom).catch(() => null);
-      const capsule: Capsule = {
-        app: "pokemu-capsule",
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        rom: { fileName: rom, hash: identity?.hash, size: identity?.size },
-        adventureId: identity?.adventureId,
-        coreVersion: coreVersion(core),
-        files,
-        data: collectRomData(localStorage, rom),
-        ...(guide ? { guide } : {}),
-      };
+      const capsule = await buildCapsule(core, rom);
+      const files = capsule.files;
       const url = URL.createObjectURL(new Blob([JSON.stringify(capsule)], { type: "application/json" }));
       const a = document.createElement("a");
       a.href = url;
@@ -128,8 +101,7 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
         ? Object.entries(registry).find(([, e]) => e.hash === capsule.rom.hash)?.[0]
         : undefined;
       const target = mesmoHash ?? capsule.rom.fileName;
-      const existentes = existingSuffixes(core.FS as unknown as CapsuleFs, core.filePaths(), target);
-      setPendente({ capsule, target, steps: planRestore(capsule, existentes, coreVersion(core)) });
+      setPendente({ capsule, target, steps: planFor(core, capsule, target) });
     } catch {
       setAviso(t("O emulador ainda não está pronto para restaurar.", "The emulator isn't ready to restore yet."));
     }
@@ -145,17 +117,7 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
     setOcupado(true);
     try {
       const core = await getCore();
-      // Os arquivos primeiro: se falharem, voltam sozinhos e os dados nem são tocados.
-      writeRestore(core.FS as unknown as CapsuleFs, core.filePaths(), target, steps);
-      applyRomData(localStorage, target, capsule.data);
-      if (capsule.guide) await writeGuideText(target, capsule.guide);
-      await core.FSSync();
-      reloadPersonalAdventures();
-      reloadLegacyAdventures();
-      reloadTrainerLog();
-      reloadPlayerDex();
-      reloadSessions();
-      reloadChallenges();
+      await restoreCapsule(core, capsule, target, steps);
       onRestored();
       setPendente(null);
       setAviso(t(`Aventura de ${adventureLabel(target)} restaurada.`, `${adventureLabel(target)} adventure restored.`));
