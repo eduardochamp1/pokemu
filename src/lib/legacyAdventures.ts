@@ -57,12 +57,19 @@ export function adventureEvents(previous: LegacySave | undefined, next: LegacySa
     ...next.trainer.badges.flatMap((b, i) => b && !previous.trainer.badges[i] ? [{ at, kind: "badge" as const, value: i }] : []),
   ];
 }
-export function recordLegacyAdventure(rom: string, save: LegacySave, at = Date.now()) {
+/**
+ * Devolve `false` quando a ficha não coube no armazenamento. Ela continua
+ * valendo nesta sessão, e quem chama avisa — antes a falha era engolida e a
+ * ficha simplesmente não estava lá na visita seguinte.
+ */
+export function recordLegacyAdventure(rom: string, save: LegacySave, at = Date.now()): boolean {
   const previous = entries.find(e => e.rom === rom);
   const events = [...(previous?.events ?? []), ...adventureEvents(previous?.save, save, at)].slice(-500);
   entries = [{ rom, save, updatedAt: at, events }, ...entries.filter(e => e.rom !== rom)];
-  try { localStorage.setItem(KEY, JSON.stringify(entries)); } catch { /* Session data remains available if storage is full. */ }
+  let saved = true;
+  try { localStorage.setItem(KEY, JSON.stringify(entries)); } catch { saved = false; }
   notify();
+  return saved;
 }
 export function useLegacyAdventures() {
   return useSyncExternalStore(fn => { listeners.add(fn); return () => { listeners.delete(fn); }; }, () => entries);

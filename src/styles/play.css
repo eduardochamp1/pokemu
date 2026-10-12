@@ -191,6 +191,8 @@
 .play-screen-overlay {
   position: absolute;
   inset: 0;
+  /* Acima da scanline: o texto do estado vazio e para ler. */
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;

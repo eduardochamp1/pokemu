@@ -14,6 +14,11 @@ export interface Backup {
   exportedAt: string;
   /** Chave do localStorage -> valor, como está guardado. */
   data: Record<string, string>;
+  /**
+   * Texto dos detonados, por ROM. Vivem no IndexedDB, fora de `data`. Ausente
+   * nos backups anteriores, em que o texto vinha dentro da ficha.
+   */
+  guides?: Record<string, string>;
 }
 
 interface StorageLike {
@@ -66,7 +71,15 @@ export function parseBackup(text: string): Backup | null {
   for (const [k, val] of Object.entries(data)) {
     if (!isSiteKey(k) || typeof val !== "string") return null;
   }
-  return { app: "pokedex", version: 1, exportedAt: b.exportedAt, data: data as Record<string, string> };
+  const out: Backup = { app: "pokedex", version: 1, exportedAt: b.exportedAt, data: data as Record<string, string> };
+  if (b.guides !== undefined) {
+    if (!b.guides || typeof b.guides !== "object" || Array.isArray(b.guides)) return null;
+    for (const text of Object.values(b.guides)) {
+      if (typeof text !== "string" || text.length > 300_000) return null;
+    }
+    out.guides = b.guides as Record<string, string>;
+  }
+  return out;
 }
 
 /** Troca os dados do site pelos do backup. O que não é do site fica como está. */

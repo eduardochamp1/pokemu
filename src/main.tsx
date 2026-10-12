@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { applyScanline, readScanline } from "./lib/scanline";
+import { migrateInlineGuides } from "./lib/personalAdventures";
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element #root not found");
@@ -11,6 +12,9 @@ if (!rootElement) throw new Error("Root element #root not found");
 // Antes do primeiro render: a pagina nunca aparece lisa para so depois
 // ganhar a textura.
 applyScanline(readScanline());
+
+// Guias gravados antes de o texto ir para o IndexedDB.
+void migrateInlineGuides();
 
 const queryClient = new QueryClient({
   defaultOptions: {

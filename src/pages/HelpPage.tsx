@@ -4,7 +4,8 @@ import { getLoadedRom } from "../emulator/core";
 import { compareRomsChronologically } from "../emulator/romChronology";
 import { useTrainerEntries } from "../lib/trainerLog";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
-import { usePersonalAdventures, usePersonalAdventure, updatePersonalAdventure } from "../lib/personalAdventures";
+import { usePersonalAdventures, usePersonalAdventure, updatePersonalAdventure, validPersonalAdventure } from "../lib/personalAdventures";
+import { useGuideText, writeGuideText } from "../lib/guideStore";
 import { useT } from "../i18n/lang";
 import AdventureJournal from "../components/AdventureJournal";
 import WalkthroughSources from "../components/WalkthroughSources";
@@ -52,7 +53,10 @@ function GuideReader({ rom }: { rom: string }) {
   const [error, setError] = useState("");
   const [limit, setLimit] = useState(30);
   const normalize = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  const sections = (entry.guide?.text ?? "").split(/\n\s*\n|\n(?=#{1,6}\s)/).map(text => text.trim()).filter(Boolean);
+  // Guia ainda não migrado traz o texto junto; os demais vêm do IndexedDB.
+  const stored = useGuideText(entry.guide && entry.guide.text === undefined ? rom : undefined);
+  const guideText = entry.guide?.text ?? stored ?? "";
+  const sections = guideText.split(/\n\s*\n|\n(?=#{1,6}\s)/).map(text => text.trim()).filter(Boolean);
   const matches = sections.filter(text => normalize(text).includes(normalize(query)));
   const importGuide = async (file?: File) => {
     if (!file) return;
@@ -61,7 +65,12 @@ function GuideReader({ rom }: { rom: string }) {
       if (!/\.(txt|md)$/i.test(file.name) || file.size > 1_200_000) throw new Error("format");
       const text = (await file.text()).replace(/\r\n?/g, "\n").trim();
       if (!text || text.length > 300_000 || text.includes("\0")) throw new Error("format");
-      updatePersonalAdventure(rom, { guide: { title: file.name.slice(0, 200), text, source: source.trim() } });
+      const guide = { title: file.name.slice(0, 200), source: source.trim(), chars: text.length };
+      // Valida antes de tocar no banco: uma fonte inválida não pode custar o
+      // texto do guia que já estava lá. Depois o texto, e só então a ficha.
+      if (!validPersonalAdventure({ ...entry, rom, guide })) throw new Error("format");
+      await writeGuideText(rom, text);
+      updatePersonalAdventure(rom, { guide });
       setQuery(""); setLimit(30);
     } catch { setError(t("Não foi possível guardar. Use TXT ou Markdown com até 300 mil caracteres, fonte http/https e espaço disponível no armazenamento.", "Could not save. Use TXT or Markdown up to 300,000 characters, an http/https source and available storage.")); }
   };

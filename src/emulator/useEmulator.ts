@@ -1342,7 +1342,15 @@ export function useEmulator() {
     if (save?.pokedex) recordPlayerDex(rom, save.playerName, save.pokedex);
     if (legacy) {
       recordPlayerDex(rom, legacy.playerName, legacy.pokedex);
-      recordLegacyAdventure(rom, legacy);
+      if (!recordLegacyAdventure(rom, legacy)) {
+        setNotice(
+          tr(
+            getLang(),
+            "A ficha desta aventura não coube no armazenamento do navegador: ela vale só até fechar a página. Exporte um backup e libere espaço.",
+            "This adventure's record didn't fit in browser storage: it only lasts until you close the page. Export a backup and free some space."
+          )
+        );
+      }
     }
     if (save) recordTrainerSave(rom, save);
   }, []);

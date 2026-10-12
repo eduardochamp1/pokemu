@@ -29,3 +29,17 @@ describe("Dados pessoais por aventura", () => {
     expect(validPersonalAdventure({ ...base, notes: [{ id: "n", text: "test", at: NaN }] })).toBe(false);
   });
 });
+
+it("leva para o banco o guia que estava inteiro no localStorage", async () => {
+  const { migrateInlineGuides, updatePersonalAdventure, reloadPersonalAdventures } = await import("./personalAdventures");
+  const { readGuideText, resetGuideStoreForTests } = await import("./guideStore");
+  resetGuideStoreForTests();
+  reloadPersonalAdventures();
+  updatePersonalAdventure("Antigo.gb", { guide: { title: "guia.txt", source: "", text: "Primeira cidade" } });
+
+  await migrateInlineGuides();
+
+  expect(await readGuideText("Antigo.gb")).toBe("Primeira cidade");
+  const gravado = JSON.parse(localStorage.getItem("pokedex:personal-adventures")!) as { rom: string; guide: unknown }[];
+  expect(gravado.find((e) => e.rom === "Antigo.gb")?.guide).toEqual({ title: "guia.txt", source: "", chars: 15 });
+});

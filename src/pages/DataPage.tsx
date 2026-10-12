@@ -9,6 +9,7 @@ import {
   type Backup,
   type BackupSummary,
 } from "../lib/backup";
+import { allGuideTexts, replaceAllGuideTexts } from "../lib/guideStore";
 import { useLang, tr, localeOf } from "../i18n/lang";
 import "../styles/trainer.css";
 import "../styles/data.css";
@@ -54,11 +55,12 @@ const DataPage = () => {
   const [vindo, setVindo] = useState<{ nome: string; backup: Backup } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const exportar = () => {
+  const exportar = async () => {
     if (!s) return;
     setErro(null);
     try {
       const b = collectBackup(s);
+      b.guides = await allGuideTexts();
       const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 1)], { type: "application/json" }));
       const a = document.createElement("a");
       a.href = url;
@@ -86,12 +88,18 @@ const DataPage = () => {
     setVindo({ nome: f.name, backup: b });
   };
 
-  const importar = () => {
+  const importar = async () => {
     if (!s || !vindo) return;
     try { applyBackup(s, vindo.backup); } catch (error) {
       setErro(error instanceof Error && error.message === "Backup restore and rollback failed"
         ? t("A restauração falhou e não foi possível repor todos os dados anteriores. Mantenha seus arquivos de backup e confira o armazenamento disponível.", "Restore failed and some previous data could not be recovered. Keep your backup files and check available storage.")
         : t("Não foi possível restaurar o backup. Os dados anteriores foram mantidos; verifique o espaço disponível.", "Could not restore the backup. Previous data was retained; check available storage."));
+      return;
+    }
+    // Backup antigo não traz `guides`: o texto vem dentro da ficha e é levado
+    // para o banco no próximo carregamento.
+    try { await replaceAllGuideTexts(vindo.backup.guides ?? {}); } catch {
+      setErro(t("Os dados foram restaurados, mas o texto dos detonados não pôde ser gravado. Recarregue a página e cadastre os guias de novo.", "Data was restored, but walkthrough text could not be saved. Reload the page and add the guides again."));
       return;
     }
     // Os stores leem o localStorage ao carregar: recarregar é o jeito honesto
@@ -127,7 +135,7 @@ const DataPage = () => {
       <section className="dados-bloco" aria-labelledby="dados-exportar">
         <h2 id="dados-exportar">{t("Neste navegador", "In this browser")}</h2>
         <Resumo r={summarize(atual.data)} />
-        <button type="button" onClick={exportar}>
+        <button type="button" onClick={() => void exportar()}>
           {t("Exportar para arquivo", "Export to file")}
         </button>
       </section>
@@ -153,7 +161,7 @@ const DataPage = () => {
               )}
             </p>
             <div className="dados-acoes">
-              <button type="button" className="dados-perigo" onClick={importar}>
+              <button type="button" className="dados-perigo" onClick={() => void importar()}>
                 {t("Substituir e recarregar", "Replace and reload")}
               </button>
               <button type="button" onClick={() => setVindo(null)}>

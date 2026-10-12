@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { writeGuideText } from "./guideStore";
 
 export interface JournalItem { id: string; text: string; at: number; done?: boolean }
 export interface PersonalAdventure {
@@ -7,7 +8,12 @@ export interface PersonalAdventure {
   slotNames: string[];
   notes: JournalItem[];
   goals: JournalItem[];
-  guide?: { title: string; text: string; source: string };
+  /**
+   * O texto do guia mora no IndexedDB (`guideStore`); aqui ficam o título, a
+   * fonte e o tamanho. `text` só aparece em dados antigos ou vindos de um
+   * backup antigo, e é levado para lá por `migrateInlineGuides`.
+   */
+  guide?: { title: string; source: string; chars?: number; text?: string };
 }
 export const PERSONAL_KEY = "pokedex:personal-adventures";
 const EMPTY: PersonalAdventure = { rom: "", favorite: false, slotNames: [], notes: [], goals: [] };
@@ -27,7 +33,7 @@ export function validPersonalAdventure(value: unknown): value is PersonalAdventu
   return typeof entry.rom === "string" && entry.rom.length > 0 && typeof entry.favorite === "boolean"
     && Array.isArray(entry.slotNames) && entry.slotNames.length <= 6 && entry.slotNames.every(name => typeof name === "string" && name.length <= 80)
     && items(entry.notes, 500) && items(entry.goals, 100)
-    && (!entry.guide || (typeof entry.guide.title === "string" && entry.guide.title.length <= 200 && typeof entry.guide.text === "string" && entry.guide.text.length <= 300_000 && validSource(entry.guide.source)));
+    && (!entry.guide || (typeof entry.guide.title === "string" && entry.guide.title.length <= 200 && (entry.guide.text === undefined || (typeof entry.guide.text === "string" && entry.guide.text.length <= 300_000)) && (entry.guide.chars === undefined || (Number.isInteger(entry.guide.chars) && entry.guide.chars >= 0)) && validSource(entry.guide.source)));
 }
 export function reloadPersonalAdventures() {
   try {
@@ -53,4 +59,24 @@ export function updatePersonalAdventure(rom: string, patch: Partial<Omit<Persona
   localStorage.setItem(PERSONAL_KEY, JSON.stringify(next));
   entries = next;
   notify();
+}
+
+/**
+ * Leva para o IndexedDB os guias que ainda estão inteiros no `localStorage`.
+ *
+ * Um por vez, e só tira o texto daqui depois de o banco confirmar a gravação:
+ * se o IndexedDB falhar, o guia continua onde estava e a tela segue lendo de
+ * lá.
+ */
+export async function migrateInlineGuides(): Promise<void> {
+  for (const entry of [...entries]) {
+    const guide = entry.guide;
+    if (!guide || guide.text === undefined) continue;
+    try {
+      await writeGuideText(entry.rom, guide.text);
+      updatePersonalAdventure(entry.rom, { guide: { title: guide.title, source: guide.source, chars: guide.text.length } });
+    } catch {
+      // fica para a próxima visita
+    }
+  }
 }

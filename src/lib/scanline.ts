@@ -1,6 +1,6 @@
 /**
- * Scanline do tubo: a unica citacao nostalgica que cobre a tela inteira, e
- * por isso a unica que precisa de botao para desligar.
+ * Scanline do tubo, desenhada so sobre a tela do jogo (ver App.css). Tem
+ * botao para desligar porque muda a imagem de quem esta jogando.
  *
  * O estado mora num atributo do <html> em vez de num contexto do React: o
  * main.tsx aplica antes do primeiro render, entao a pagina nunca aparece sem

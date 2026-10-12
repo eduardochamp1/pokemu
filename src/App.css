@@ -671,13 +671,14 @@ textarea:focus-visible,
 }
 
 /* ========= Scanline do tubo =========
-   A unica citacao que cobre a tela inteira — e por isso a unica com botao
-   para desligar. Opacidade baixa de proposito: e textura, nao efeito. */
-html[data-scanline="on"] body::after {
+   So sobre a tela do jogo: em cima de texto e formulario ela tirava nitidez
+   da leitura sem dar nada em troca. Opacidade baixa de proposito: e textura,
+   nao efeito. */
+html[data-scanline="on"] .play-screen::after {
   content: "";
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 300;
+  z-index: 2;
   pointer-events: none;
   background:
     radial-gradient(ellipse at center, transparent 52%, rgba(0, 0, 0, 0.38) 100%),

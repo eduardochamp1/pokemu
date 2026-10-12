@@ -99,3 +99,22 @@ describe("backupFileName", () => {
     expect(backupFileName(new Date(2026, 8, 27))).toBe("pokedex-dados-2026-09-27.json");
   });
 });
+
+describe("guias no backup", () => {
+  const base = { app: "pokedex", version: 1, exportedAt: new Date(0).toISOString(), data: {} };
+
+  it("aceita o texto dos detonados e o devolve", () => {
+    const b = parseBackup(JSON.stringify({ ...base, guides: { "Red.gb": "texto" } }));
+    expect(b?.guides).toEqual({ "Red.gb": "texto" });
+  });
+
+  it("backup antigo, sem o campo, continua válido", () => {
+    expect(parseBackup(JSON.stringify(base))).toEqual(base);
+  });
+
+  it("recusa guia que não é texto ou passa do limite", () => {
+    expect(parseBackup(JSON.stringify({ ...base, guides: { "Red.gb": 5 } }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ ...base, guides: ["x"] }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ ...base, guides: { "Red.gb": "x".repeat(300_001) } }))).toBeNull();
+  });
+});

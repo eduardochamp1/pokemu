@@ -5,7 +5,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 
 - [x] 1. Commitar o trabalho existente em blocos lógicos
 - [x] 2. Identidade da ROM por hash + ID de aventura, com migração por renomeação
-- [ ] 3. Scanline só na tela do jogo; erro de gravação visível em `legacyAdventures`; guias fora do `localStorage`
+- [x] 3. Scanline só na tela do jogo; erro de gravação visível em `legacyAdventures`; guias fora do `localStorage`
 - [ ] 4. Aventura ativa compartilhada entre Aventuras, Ginásios, Ajuda e Planejar batalhas
 - [ ] 5. Redesenho da biblioteca e do palco, quebrando a `PlayPage`
 - [ ] 6. Resumo "Onde parei?"
@@ -43,6 +43,14 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - Não conferido no navegador com uma ROM de verdade: carregar uma dispara o
   backup em `saves/`, que o loop não pode alterar. Coberto por testes com core
   e armazenamento falsos.
+
+### 3. Correções pequenas
+
+- A scanline passou a ser desenhada só sobre a tela do jogo.
+- A ficha de Gen 1/2 que não cabe no armazenamento agora gera aviso.
+- O texto dos detonados foi para o IndexedDB (banco `pokemu`, store
+  `guides`); no `localStorage` ficam título, fonte e tamanho. Guias antigos
+  migram sozinhos ao abrir o site, e o texto entra no backup num campo próprio.
 
 ## Dúvidas para o usuário
 

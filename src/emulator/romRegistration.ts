@@ -2,6 +2,7 @@ import type { mGBAEmulator } from "./types";
 import { isSupportedRom } from "./types";
 import { renameRomFiles, type FsLike } from "./romFiles";
 import { loadRegistry, registerRom, sha256Hex, type RomSource } from "../lib/romIdentity";
+import { renameGuideText } from "../lib/guideStore";
 import { reloadLegacyAdventures } from "../lib/legacyAdventures";
 import { reloadPersonalAdventures } from "../lib/personalAdventures";
 import { reloadPlayerDex } from "../lib/playerDex";
@@ -69,6 +70,7 @@ export async function registerLoadedRom(
     } catch {
       // já não estava lá
     }
+    await renameGuideText(renamedFrom, rom).catch(() => undefined);
     reloadPersonalAdventures();
     reloadLegacyAdventures();
     reloadTrainerLog();
