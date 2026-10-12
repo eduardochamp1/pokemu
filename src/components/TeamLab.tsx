@@ -53,7 +53,7 @@ export default function TeamLab({ entry }: { entry?: TrainerEntry }) {
   const tipos = (lista: readonly string[]) => lista.map((x) => tType(x, lang)).join(", ");
 
   return (
-    <section className="team-lab" aria-label={t("Laboratório do time", "Team lab")}>
+    <section className="ui-panel team-lab" aria-label={t("Laboratório do time", "Team lab")}>
       <h2>{t("Laboratório do time", "Team lab")}</h2>
       {!entry?.team?.length ? (
         <p className="page-scope">

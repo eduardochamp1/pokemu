@@ -1,5 +1,6 @@
 @import "./design/tokens.css";
 @import "./styles/holo.css";
+@import "./styles/ui.css";
 
 /* ========= Reset ========= */
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -441,7 +442,7 @@ img { display: block; max-width: 100%; }
   margin: 0 auto 30px;
   padding: 14px;
   border-radius: 16px 16px 22px 22px;
-  background: linear-gradient(160deg, #d8453a, #9b2a22);
+  background: linear-gradient(160deg, var(--shell-top), var(--shell-bottom));
   box-shadow:
     0 16px 30px rgba(155, 42, 34, 0.3),
     inset 0 2px 0 rgba(255, 255, 255, 0.28);
@@ -796,4 +797,38 @@ html[data-scanline="on"] .play-screen::after {
 .nav-adventure:hover { border-color: var(--accent); color: var(--text); }
 @media (max-width: 860px) {
   .nav-adventure { display: none; }
+}
+
+/* ========= Navbar: a cauda e o trilho lateral =========
+   O que nao e link de pagina (aventura ativa, idioma, instalar, scanline)
+   anda junto. No topo fica a direita; no trilho, embaixo. */
+.nav-tail { display: flex; align-items: center; gap: 10px; }
+
+/* Em tela larga a navegacao vai para a lateral: a altura e o que falta num
+   monitor deitado, e a barra do topo tirava 56 px de todas as paginas — do
+   jogo, principalmente. */
+@media (min-width: 1100px) {
+  :root { --nav-offset: 0px; }
+  .navbar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--rail-w);
+    height: auto;
+    padding: 18px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 18px;
+    border-bottom: 0;
+    border-right: 2px solid var(--border);
+    overflow-y: auto;
+  }
+  .navbar-brand { align-self: flex-start; }
+  .nav-links { flex-direction: column; gap: 2px; }
+  .nav-link { padding: 9px 12px; }
+  .nav-tail { margin-top: auto; flex-direction: column; align-items: stretch; gap: 10px; }
+  .nav-tail > * { align-self: flex-start; }
+  .nav-adventure { max-width: 100%; align-self: stretch !important; text-align: center; }
+  main#conteudo,
+  .offline-banner { margin-left: var(--rail-w); }
 }

@@ -124,7 +124,7 @@
   position: relative;
   display: grid;
   place-items: center;
-  height: min(68vh, 600px);
+  height: min(74vh, 660px);
   background: #05060a;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-card);
@@ -455,7 +455,7 @@
   flex-direction: column;
   gap: 14px;
   position: sticky;
-  top: 76px;
+  top: calc(var(--nav-offset) + 20px);
 }
 .play-panel {
   box-shadow: inset 0 0 0 2px var(--surface-2), var(--shadow-card);
@@ -990,32 +990,34 @@
    A direcao "objeto" fica restrita a esta tela e ao 404: aqui a moldura e o
    assunto. Ela envolve a tela e para ali — o conteudo dentro segue limpo. */
 .play-stage {
-  padding: 14px;
-  border-radius: 18px 18px 22px 22px;
-  background: linear-gradient(160deg, #d8453a, #9b2a22);
+  padding: 8px;
+  border-radius: 12px 12px 16px 16px;
+  background: linear-gradient(160deg, var(--shell-top), var(--shell-bottom));
   box-shadow:
     0 16px 34px rgba(155, 42, 34, 0.26),
     inset 0 2px 0 rgba(255, 255, 255, 0.26);
 }
+/* A faixa de cima da carcaca fica baixa: e enfeite, e cada pixel dela era
+   tirado da tela do jogo. */
 .play-deck {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 2px 4px 12px;
+  gap: 8px;
+  padding: 0 4px 6px;
 }
 .play-deck-lens {
-  width: 36px;
-  height: 36px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 30%, #bfe6ff, #4ea8de 55%, #1c6ea8);
-  border: 3px solid #f2f2f5;
-  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.35);
+  border: 2px solid #f2f2f5;
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
 }
 .play-deck-leds { display: flex; gap: 6px; }
 .play-deck-leds span {
-  width: 11px;
-  height: 11px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.3);
 }
@@ -1024,8 +1026,8 @@
 .play-deck-leds span:nth-child(3) { background: #7ac74c; }
 .play-deck-grille {
   margin-left: auto;
-  width: 92px;
-  height: 22px;
+  width: 64px;
+  height: 12px;
   border-radius: 3px;
   background: repeating-linear-gradient(
     to bottom,
@@ -1035,7 +1037,7 @@
 }
 /* Bezel: a tela fica embutida na carcaca, nao colada por cima dela. */
 .play-screen {
-  border: 4px solid #2a2a2e;
+  border: 3px solid var(--shell-bezel);
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 /* Os controles ficam sobre o plastico: precisam do proprio fundo escuro. */
@@ -1290,3 +1292,23 @@
 .branch-new { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .branch-new label { display: grid; gap: 4px; flex: 1; min-width: 140px; font-size: 0.75rem; color: var(--text-muted); }
 .branch-new input { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; }
+
+/* Painel lateral recolhido: o palco fica com a largura toda. */
+.play-layout.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+.play-layout.is-collapsed .play-sidebar { display: none; }
+.workspace-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+.workspace-row .workspace-nav { margin-bottom: 0; }
+.panel-toggle {
+  padding: 8px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  min-height: var(--control-h);
+}
+.panel-toggle:hover { border-color: var(--accent); color: var(--text); }
+/* Em tela estreita o painel ja desce para baixo do palco: nao ha o que recolher. */
+@media (max-width: 900px) {
+  .panel-toggle { display: none; }
+  .play-layout.is-collapsed .play-sidebar { display: flex; }
+}

@@ -43,7 +43,7 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
   const visitadas = new Set(visitedTowns ?? []);
 
   return (
-    <section className="progress-map" aria-label={t("Mapa de progresso", "Progress map")}>
+    <section className="ui-panel progress-map" aria-label={t("Mapa de progresso", "Progress map")}>
       <h2>{t("Mapa de progresso", "Progress map")}</h2>
 
       {visitedTowns ? (
@@ -107,7 +107,7 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
         {t("Seus lugares marcados", "Your marked places")} · {marks.length}
       </h3>
       <form
-        className="challenge-form"
+        className="ui-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (!place.trim() || marks.length >= MAX_MARKS) return;
@@ -127,7 +127,7 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
         <button type="submit" disabled={!place.trim()}>{t("Marcar", "Mark")}</button>
       </form>
       {marks.length > 0 && (
-        <ul className="challenge-list">
+        <ul className="ui-list">
           {sortMarks(marks).map((m) => (
             <li key={m.id}>
               <label className={m.done ? "is-done" : undefined}>

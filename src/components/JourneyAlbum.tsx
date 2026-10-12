@@ -74,7 +74,7 @@ export default function JourneyAlbum({ entry, nameOf }: { entry: TrainerEntry; n
   };
 
   return (
-    <section className="journey-album" aria-label={t("Álbum da jornada", "Journey album")}>
+    <section className="ui-panel journey-album" aria-label={t("Álbum da jornada", "Journey album")}>
       <h2>
         {t("Álbum da jornada", "Journey album")} <span>{momentos.length}</span>
       </h2>

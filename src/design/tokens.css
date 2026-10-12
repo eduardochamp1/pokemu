@@ -38,6 +38,27 @@
   --radius-card: 10px;
   --radius-sm: 6px;
   --radius-pill: 999px;
+  --radius-panel: 12px;  /* painel com titulo (ui.css) */
+  --radius-field: 8px;   /* campo e botao de formulario */
+
+  /* Medidas que mais de uma tela usa */
+  --panel-pad: 20px;
+  --control-h: 40px;
+  /* Altura da navbar no topo. Vira 0 quando ela passa para a lateral: e o
+     que os elementos "grudados" somam para nao ficar atras dela. */
+  --nav-offset: 56px;
+  --rail-w: 212px;
+
+  /* Carcaca do aparelho: o emulador e o 404 usam a mesma. */
+  --shell-top: #d8453a;
+  --shell-bottom: #9b2a22;
+  --shell-bezel: #2a2a2e;
+
+  /* Cartucho por console, para o jogo que nao e uma edicao oficial. */
+  --cart-gb: #404b37;
+  --cart-gbc: #493453;
+  --cart-gba: #343958;
+  --cart-shade: #1b2431;
 
   /* Motion */
   --dur-fast: 120ms;

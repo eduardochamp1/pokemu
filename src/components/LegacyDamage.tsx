@@ -102,7 +102,7 @@ export default function LegacyDamage() {
   const pct = (n: number) => (statsAlvo ? `${Math.round((n / statsAlvo.hp) * 100)}%` : "");
 
   return (
-    <section className="team-lab" aria-label={t("Dano de Gen 1 e Gen 2", "Gen 1 and Gen 2 damage")}>
+    <section className="ui-panel team-lab" aria-label={t("Dano de Gen 1 e Gen 2", "Gen 1 and Gen 2 damage")}>
       <h2>{t("Dano de Gen 1 e Gen 2", "Gen 1 and Gen 2 damage")}</h2>
       <div className="legacy-damage-form">
         <label>

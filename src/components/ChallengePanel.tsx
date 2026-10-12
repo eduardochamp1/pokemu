@@ -107,7 +107,7 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         ))}
       </ul>
       <form
-        className="challenge-form"
+        className="ui-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (!regra.trim()) return;
@@ -168,7 +168,7 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         {t("Encontros por área", "Encounters by area")} · {challenge.encounters.length}
       </h3>
       <form
-        className="challenge-form"
+        className="ui-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (!area.trim() || repetida) return;
@@ -202,7 +202,7 @@ export default function ChallengePanel({ rom }: { rom: string }) {
       </form>
       {repetida && <p role="status" className="challenge-alert">{t("Esta área já tem um encontro registrado.", "This area already has a logged encounter.")}</p>}
       {challenge.encounters.length > 0 && (
-        <ul className="challenge-list">
+        <ul className="ui-list">
           {[...challenge.encounters].reverse().map((e) => (
             <li key={e.id}>
               <span>
@@ -221,7 +221,7 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         {t("Perdas", "Losses")} · {challenge.losses.length}
       </h3>
       <form
-        className="challenge-form"
+        className="ui-form"
         onSubmit={(e) => {
           e.preventDefault();
           if (!perda.trim()) return;
@@ -241,7 +241,7 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         <button type="submit" disabled={!perda.trim()}>{t("Registrar", "Log")}</button>
       </form>
       {challenge.losses.length > 0 && (
-        <ul className="challenge-list">
+        <ul className="ui-list">
           {[...challenge.losses].reverse().map((l) => (
             <li key={l.id}>
               <span>

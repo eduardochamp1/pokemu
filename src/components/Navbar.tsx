@@ -47,6 +47,7 @@ const Navbar = () => {
           {t("Backup", "Backup")}
         </NavLink>
       </div>
+      <div className="nav-tail">
       {/* A aventura que as páginas estão usando, sempre à vista: é o que
           evita simular uma batalha com o time de outro jogo sem perceber. */}
       {ativa && (
@@ -58,6 +59,7 @@ const Navbar = () => {
       <LangToggle />
       <InstallButton />
       <ScanlineToggle />
+      </div>
     </nav>
   );
 };

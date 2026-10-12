@@ -260,7 +260,10 @@ navegador; nada vai para servidor.
   cobertura e quem do PC ajudaria, com o motivo.
 - **Preparação para o próximo líder** (`/ginasios`) — diferença de nível,
   pokémon sem resposta e atalhos que abrem a calculadora já montada. O guia
-  cobre também os oito líderes de Johto em Gold/Silver/Crystal.
+  cobre Emerald, FireRed/LeafGreen, Red/Blue, Yellow e os dezesseis líderes
+  de Gold/Silver/Crystal, cada geração com a sua tabela de tipos.
+- **Dano de Gen 1 e Gen 2** (`/dano`) — as fórmulas das decompilações, com o
+  Especial único e o crítico da Gen 1, e o time com os status do save.
 - **Álbum da jornada** — insígnias, evoluções e conquistas em cartões com PNG.
 - **Modo desafio** — regras, limite de nível, um encontro por área e perdas.
   O site só confere o nível; o resto é registro seu.
@@ -338,6 +341,7 @@ Sem a variável os links viram texto e o resto funciona igual.
 | `npm run bench` | Mede a velocidade do emulador em quadros emulados por segundo. Precisa do `npm run dev` de pé e do Chrome |
 | `npm run sprites` | Baixa os sprites para `public/sprites/` |
 | `npm run catalog` | Regera o catálogo offline da Gen 3 a partir da PokéAPI |
+| `npm run catalog:legacy` | Regera os dados de Gen 1 e Gen 2 a partir das decompilações pret |
 | `npm run gen3:species <rom.gba>` | Regera a tabela de espécies da Gen 3 lendo a sua ROM |
 | `npm run gen3:save-check "<arquivo.sav>"` | Valida o leitor de save contra um `.sav` de verdade |
 

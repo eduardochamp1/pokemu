@@ -19,8 +19,8 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 14. Modo desafio
 - [x] 15. Ramificações de aventura
 - [x] 16. Mapa de progresso
-- [x] 17. Ginásios, dano e comparação para Gen 1/2 — **parcial**, ver notas
-- [x] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana — **parcial**, ver notas
+- [x] 17. Ginásios, dano e comparação para Gen 1/2
+- [x] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana — falta só save real de Gen 1/2, ver notas
 - [x] 19. CI no GitHub
 - [x] 20. Renomear os caches `pokedex-*` do service worker sem perder dados
 - [x] 21. Assinatura digital do `.exe` (depende de certificado: documentar o que falta)
@@ -64,29 +64,47 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
   (que agora só aparece sem jogos), cartucho na cor da edição oficial e
   progresso lido do save no card.
 - Palco vazio: botões para abrir a biblioteca ou adicionar um arquivo.
-- Ficou de fora do redesenho: navegação lateral, moldura menor do emulador,
-  painel recolhível e a unificação dos tokens visuais.
+- Segunda rodada: em tela de 1100 px ou mais a navegação vai para um trilho
+  lateral; a moldura do emulador ficou baixa (a tela do jogo ganhou altura); o
+  painel lateral pode ser recolhido ("Só o jogo"), e a escolha fica guardada.
+- Tokens: raio, espaçamento e altura de controle passam a ter nome em
+  `tokens.css`; a carcaça e os cartuchos deixaram de repetir cores soltas; e
+  `styles/ui.css` define uma vez o painel com título, o formulário de uma
+  linha e a lista com remover, que cinco telas repetiam.
+- Conferido por medidas no navegador em 1366, 1000 e 375 px (sem estouro
+  horizontal). **Não foi visto em imagem**: a captura de tela do navegador de
+  teste falhou, então vale uma olhada sua.
 
-### 17. Gen 1/2 nas ferramentas (parcial)
+### 12. Dicas em três níveis
 
-Feito:
-- Guia de ginásios para os oito líderes de Johto (Gold/Silver/Crystal), com o
-  time lido do save de Gen 2. Os times foram transcritos de memória da
-  decompilação e **não foram conferidos linha a linha**; o teste garante só
-  que toda espécie e todo golpe existem.
-- Comparação de dois saves de Gen 1 ou Gen 2 em "Comparar saves".
+- O que as dicas dizem sobre os **times dos líderes** (espécies, tipos, golpes
+  marcantes) foi conferido contra `data/gymLeaders.ts`, que vem das
+  decompilações. O **caminho** entre os ginásios (quem dá qual item, por onde
+  passar) foi escrito de memória e não tem fonte primária no projeto.
 
-Ficou de fora, e por quê:
-- **Ginásios de Gen 1.** A tabela de tipos era outra (sem Aço e Sombrio,
-  Fantasma não atingia Psíquico, Inseto e Veneno se batiam) e vários golpes
-  tinham outro tipo (Bite, Gust, Karate Chop). Precisa de tabela e de dados
-  de golpe próprios da Gen 1 antes de dar conselho.
-- **Os oito ginásios de Kanto em Gold/Silver/Crystal.**
-- **Cálculo de dano de Gen 1 e Gen 2.** A fórmula, os críticos e os status
-  (DVs e experiência de status) são outros; a calculadora atual segue a
-  decompilação de Emerald e não serve de base.
+### 17. Gen 1/2 nas ferramentas
 
-### 18. Leitores de save (parcial)
+- Os dados de Gen 1 e Gen 2 são gerados das decompilações (pret/pokered,
+  pret/pokeyellow, pret/pokecrystal) por `npm run catalog:legacy`: espécies,
+  golpes, tabela de tipos e times dos líderes. Nada escrito de memória.
+- Guia de ginásios: Red/Blue, Yellow e os dezesseis líderes de
+  Gold/Silver/Crystal, cada geração com a sua tabela de tipos. Os times de
+  Johto da primeira rodada, transcritos de memória, foram conferidos contra o
+  arquivo: batiam.
+- Cálculo de dano de Gen 1 e Gen 2 em "Planejar batalhas", com as fórmulas
+  das decompilações.
+- Comparação de dois saves de Gen 1 ou Gen 2.
+- A conferência cruzada achou um erro antigo: o catálogo de Gen 3 e a leitura
+  da PokéAPI usavam os status base de hoje. Trinta espécies foram reforçadas
+  depois da Gen 3; agora os dois aplicam `past_stats`.
+
+Limites que continuam:
+- Os times de GSC vêm da Crystal; Gold e Silver podem diferir em detalhe.
+- O cálculo de dano não inclui estágios de status, itens, bônus de insígnia
+  nem golpes de dano fixo. O alvo é uma suposição declarada na tela.
+- Ruby/Sapphire seguem sem guia de ginásios.
+
+### 18. Leitores de save
 
 Feito:
 - Os dois saves reais de `saves/` foram lidos, sem alteração (o hash dos
@@ -96,12 +114,15 @@ Feito:
 - O nível dos pokémon no PC de Gen 1 agora sai da experiência, pela curva da
   espécie. A conta bate com o nível gravado no time dos dois saves reais.
 
-Ficou de fora, e por quê:
-- **Não há save real de Gen 1 nem de Gen 2** em `saves/`. Os leitores dessas
-  gerações continuam validados só por fixtures sintéticas.
-- **Gen 2 japonesa e coreana.** Os offsets, o tamanho dos nomes e o layout
-  das caixas são outros. Sem um save real (ou os offsets conferidos na
-  referência, mais uma fixture) o leitor sairia sem como saber se está certo.
+- Gen 2 japonesa (Gold/Silver/Crystal) e Gold/Silver coreana ganharam
+  leitor, com os offsets de `SAV2Offsets` do PKHeX. A coreana é reconhecida
+  pelo checksum. Os nomes em coreano não são decodificados.
+
+Depende de você:
+- **Não há save real de Gen 1 nem de Gen 2** em `saves/`, de nenhuma edição.
+  Esses leitores — os internacionais, os japoneses e o coreano — continuam
+  validados só por fixtures. Para fechar: jogar e salvar dentro do jogo e
+  rodar `npm run save:check -- "<rom>" "<save>"`.
 
 ### 19. CI
 
@@ -123,7 +144,12 @@ Ficou de fora, e por quê:
 
 ## Dúvidas para o usuário
 
-- **Saves de Gen 1 e Gen 2 para validar.** Se você jogar e salvar em Red/Blue/Yellow e em Gold/Silver/Crystal, os arquivos aparecem em `saves/` e dá para conferir os leitores com `npm run save:check`.
-- **Certificado de assinatura de código** para o `.exe`: é uma compra ou contratação sua (ver `docs/assinatura-windows.md`).
-- **Push.** O loop commitou tudo no `main` local e não enviou nada ao GitHub. O CI só começa a rodar depois do push.
-- **Gen 2 japonesa e coreana:** você tem alguma dessas ROMs e quer o leitor? Sem ROM nem save não há como validar.
+O que sobrou depende só de você:
+
+- **Saves reais de Gen 1 e Gen 2** para validar os leitores (item 18).
+- **Certificado de assinatura de código** para o `.exe` (item 21, ver
+  `docs/assinatura-windows.md`).
+- **Olhar o redesenho** (trilho lateral, moldura menor, painel recolhível):
+  foi conferido por medidas, não por imagem.
+- **Tabela de nomes em coreano**, se você tiver uma Gold/Silver coreana e
+  quiser ver os nomes: precisa de uma fonte com licença compatível.

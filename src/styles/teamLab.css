@@ -1,20 +1,5 @@
 /* Laboratorio do time, em "Planejar batalhas" e na preparacao para o lider. */
-.team-lab {
-  margin-top: 28px;
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-1);
-}
-.team-lab h2 { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 12px; }
-.team-lab h3 {
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin: 18px 0 8px;
-}
-.team-lab p { font-size: 0.88rem; line-height: 1.6; }
+/* A caixa, o titulo e os rotulos vem de .ui-panel (ui.css). */
 .team-lab-list { list-style: none; display: grid; gap: 8px; }
 .team-lab-list li {
   display: flex;
@@ -39,6 +24,6 @@
 .legacy-damage-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: end; }
 .legacy-damage-form label { display: grid; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
 .legacy-damage-form select,
-.legacy-damage-form input[type="number"] { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 10px; font-size: 0.85rem; min-height: 40px; }
-.legacy-damage-form .legacy-damage-check { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); min-height: 40px; }
+.legacy-damage-form input[type="number"] { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-field); padding: 9px 10px; font-size: 0.85rem; min-height: var(--control-h); }
+.legacy-damage-form .legacy-damage-check { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); min-height: var(--control-h); }
 .legacy-damage-result { margin-top: 16px; font-family: var(--font-display); font-size: 1.15rem !important; }

@@ -1,5 +1,7 @@
 
+import { useState } from "react";
 import "../styles/play.css";
+import { loadPref, savePref } from "../emulator/prefs";
 import PlayAnnouncer from "../components/PlayAnnouncer";
 import {
   isTypingTarget,
@@ -27,6 +29,15 @@ import SettingsPanel from "./play/SettingsPanel";
 
 const PlayPage = () => {
   const p = usePlayPage();
+  // Recolher o painel lateral dá a largura toda ao jogo. É preferência do
+  // aparelho, como a escala: fica guardada entre visitas.
+  const [painelRecolhido, setPainelRecolhido] = useState(() => loadPref("panel-collapsed", (v): v is boolean => typeof v === "boolean") ?? false);
+  const alternarPainel = () => {
+    setPainelRecolhido((atual) => {
+      savePref("panel-collapsed", !atual);
+      return !atual;
+    });
+  };
   const { capturing, currentRom, emu, en, lang, libraryGames, libraryView, playing, romInputRef, setInputEnabled, setSidebarArea, showWorkspace, sidebarArea, tx } = p;
   return (
     <div className="play-shell" onFocusCapture={event => {
@@ -78,10 +89,17 @@ const PlayPage = () => {
           </div>
         )}
       </header>
-      <nav className="workspace-nav" aria-label={tx("Área de jogos", "Game workspace")}>
-        <button aria-current={libraryView ? "page" : undefined} onClick={() => showWorkspace("biblioteca")}>{tx("Biblioteca", "Library")} <span>{libraryGames.length}</span></button>
-        <button aria-current={!libraryView ? "page" : undefined} onClick={() => showWorkspace("jogar")}>{tx("Jogar", "Play")}{playing && <span>●</span>}</button>
-      </nav>
+      <div className="workspace-row">
+        <nav className="workspace-nav" aria-label={tx("Área de jogos", "Game workspace")}>
+          <button aria-current={libraryView ? "page" : undefined} onClick={() => showWorkspace("biblioteca")}>{tx("Biblioteca", "Library")} <span>{libraryGames.length}</span></button>
+          <button aria-current={!libraryView ? "page" : undefined} onClick={() => showWorkspace("jogar")}>{tx("Jogar", "Play")}{playing && <span>●</span>}</button>
+        </nav>
+        {!libraryView && (
+          <button type="button" className="panel-toggle" aria-pressed={painelRecolhido} onClick={alternarPainel}>
+            {painelRecolhido ? tx("Mostrar o painel", "Show the panel") : tx("Só o jogo", "Game only")}
+          </button>
+        )}
+      </div>
 
       {emu.status.kind === "unsupported" && (
         <section className="play-diag" role="alert">
@@ -137,7 +155,7 @@ const PlayPage = () => {
         onContinue={() => showWorkspace("jogar")}
         onImport={() => romInputRef.current?.click()}
         onRefresh={() => void emu.refreshLocalRoms()} /></div>
-      <div className="play-layout" hidden={libraryView}>
+      <div className={"play-layout" + (painelRecolhido ? " is-collapsed" : "")} hidden={libraryView}>
         <PlayStage p={p} />
 
         <aside className="play-sidebar">
