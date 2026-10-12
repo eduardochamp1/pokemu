@@ -37,8 +37,10 @@ import {
   stateThumbnailName,
   toDataUrl,
 } from "./capture";
-import { GBA_HEADER_BYTES, identifyRom, type RomId } from "./romId";
+import { ROM_HEADER_BYTES, identifyRom, type RomId } from "./romId";
 import { parseGen3Save, type Gen3PartyMember } from "./saveParse/gen3";
+import { parseLegacySave, type LegacySave } from "./saveParse/legacy";
+import { recordLegacyAdventure } from "../lib/legacyAdventures";
 import { recordPlayerDex } from "../lib/playerDex";
 import { recordTrainerSave } from "../lib/trainerLog";
 import { getLang, tr } from "../i18n/lang";
@@ -173,9 +175,9 @@ function lerCabecalho(
   let stream: unknown;
   try {
     stream = fs.open(caminho, "r");
-    const bytes = new Uint8Array(GBA_HEADER_BYTES);
-    const lidos = fs.read(stream, bytes, 0, GBA_HEADER_BYTES, 0);
-    return lidos === GBA_HEADER_BYTES ? bytes : null;
+    const bytes = new Uint8Array(ROM_HEADER_BYTES);
+    const lidos = fs.read(stream, bytes, 0, ROM_HEADER_BYTES, 0);
+    return lidos === ROM_HEADER_BYTES ? bytes : null;
   } catch {
     return null;
   } finally {
@@ -727,7 +729,7 @@ export function useEmulator() {
       // Os 192 primeiros bytes bastam, e o arquivo ja esta em memoria.
       setRomId(
         identifyRom(
-          new Uint8Array(await flatFile.slice(0, GBA_HEADER_BYTES).arrayBuffer())
+          new Uint8Array(await flatFile.slice(0, ROM_HEADER_BYTES).arrayBuffer())
         )
       );
 
@@ -1261,12 +1263,11 @@ export function useEmulator() {
   /**
    * O time do jogador, lido do save de bateria.
    *
-   * `null` enquanto não há jogo, e `[]` quando há save mas nenhum pokémon — os
-   * dois casos são diferentes na tela. Romhack e jogo que não seja de Gen 3
-   * simplesmente não abrem: o painel diz isso em uma frase, e nunca fica num
-   * carregando eterno.
+   * Gen 3 mantém a ficha existente; GB/GBC usa LegacySave para preservar DVs,
+   * experiência de status e atributos próprios. Save inválido não vira ficha.
    */
   const [team, setTeam] = useState<Gen3PartyMember[] | null>(null);
+  const [legacySave, setLegacySave] = useState<LegacySave | null>(null);
   const [teamLido, setTeamLido] = useState(false);
 
   const refreshTeam = useCallback(() => {
@@ -1274,6 +1275,7 @@ export function useEmulator() {
     const rom = getLoadedRom();
     if (!core || !rom) {
       setTeam(null);
+      setLegacySave(null);
       setTeamLido(false);
       return;
     }
@@ -1283,12 +1285,19 @@ export function useEmulator() {
     } catch {
       bytes = null;
     }
-    const save = bytes ? parseGen3Save(bytes) : null;
+    const id = identifyRom(lerCabecalho(core, rom));
+    const legacy = bytes ? parseLegacySave(bytes, id) : null;
+    const save = bytes && !id?.legacyGame ? parseGen3Save(bytes) : null;
+    setLegacySave(legacy);
     setTeam(save?.party ?? null);
     setTeamLido(true);
     // A mesma leitura alimenta a Pokédex da Home e a página do treinador,
     // que não carregam o core.
     if (save?.pokedex) recordPlayerDex(rom, save.playerName, save.pokedex);
+    if (legacy) {
+      recordPlayerDex(rom, legacy.playerName, legacy.pokedex);
+      recordLegacyAdventure(rom, legacy);
+    }
     if (save) recordTrainerSave(rom, save);
   }, []);
 
@@ -1328,6 +1337,7 @@ export function useEmulator() {
     } else {
       setScreenshots([]);
       setTeam(null);
+      setLegacySave(null);
       setTeamLido(false);
     }
   }, [romCarregada, refreshScreenshots, refreshTeam]);
@@ -1507,6 +1517,7 @@ export function useEmulator() {
     setRewinding,
     takeScreenshot,
     team,
+    legacySave,
     teamLido,
     screenshots,
     refreshScreenshots,

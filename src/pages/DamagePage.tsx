@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMoveDetail, usePokemonDetail, usePokemonIndex } from "../hooks/usePokemon";
-import { useTrainerEntry } from "../lib/trainerLog";
+import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import type { Gen3PartyMember } from "../emulator/saveParse/gen3";
 import {
   calcGen3Damage,
@@ -82,9 +82,15 @@ function useLado(sel: Sel, team: Gen3PartyMember[]): Lado {
  * contra qualquer pokémon (ou outro do time).
  */
 const DamagePage = () => {
+  const entries = useTrainerEntries();
+  const [rom, setRom] = useState("");
+  const entry = entries.find(entry => entry.rom === rom) ?? entries[0];
+  return <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setRom} />;
+};
+
+const DamageCalculator = ({ entry, entries, onSelect }: { entry?: TrainerEntry; entries: TrainerEntry[]; onSelect: (rom: string) => void }) => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
-  const entry = useTrainerEntry();
   const team = entry?.team ?? [];
 
   const [atk, setAtk] = useState<Sel>(() =>
@@ -131,7 +137,7 @@ const DamagePage = () => {
   return (
     <div className="trainer-shell">
       <header className="trainer-header">
-        <h1>{t("Dano (Gen 3)", "Damage (Gen 3)")}</h1>
+        <h1>{t("Planejar batalhas", "Plan battles")}</h1>
         <span className="trainer-sub">
           {t(
             "A fórmula de Ruby, Sapphire, Emerald, FireRed e LeafGreen, seguindo a decompilação.",
@@ -139,6 +145,13 @@ const DamagePage = () => {
           )}
         </span>
       </header>
+      <label className="page-selector">{t("Time da aventura · Gen 3", "Adventure team · Gen 3")}
+        <select value={entry?.rom ?? ""} onChange={event => onSelect(event.target.value)} disabled={!entries.length}>
+          {!entries.length && <option value="">{t("Sem save — simulação com Pokémon escolhidos", "No save — simulate with selected Pokémon")}</option>}
+          {entries.map(entry => <option key={entry.rom} value={entry.rom}>{entry.rom.replace(/\.[^.]+$/, "")}</option>)}
+        </select>
+      </label>
+      <p className="page-scope">{t("Esta calculadora usa as regras da Gen 3. Saves de Gen 1 e Gen 2 ainda não são usados aqui. Ao trocar a aventura, os lados e as condições da simulação são reiniciados.", "This calculator uses Gen 3 rules. Gen 1 and Gen 2 saves are not used here yet. Changing the adventure resets both sides and simulation conditions.")}</p>
 
       <div className="dano-lados">
         <EditorDeLado titulo={t("Atacante", "Attacker")} sel={atk} onChange={setAtk} team={team} lado={a} />
@@ -362,7 +375,7 @@ const EditorDeLado = ({ titulo, sel, onChange, team, lado }: EditorProps) => {
       </div>
       {team.length === 0 && (
         <p className="trainer-sub">
-          {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Emulador", "Emulator")}</Link>,{" "}
+            {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Biblioteca", "Library")}</Link>,{" "}
           {t("o seu time entra aqui com os status exatos.", "your team shows up here with exact stats.")}
         </p>
       )}

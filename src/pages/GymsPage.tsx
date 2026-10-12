@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMoveDetails, usePokemonIndex, usePokemonsByNames } from "../hooks/usePokemon";
-import { useTrainerEntry } from "../lib/trainerLog";
+import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import { namesForIds } from "../lib/filters";
 import { moveSlugById } from "../lib/teamSheet";
 import { gen3MoveData, gen3PokemonTypes } from "../lib/gen3Damage";
@@ -19,8 +19,7 @@ import "../styles/gyms.css";
 type Jogo = "emerald" | "frlg";
 
 /** O seu time do save como `BattleMember`: tipos e golpes de Gen 3. */
-function useMeuTime(): BattleMember[] {
-  const entry = useTrainerEntry();
+function useMeuTime(entry: TrainerEntry | undefined): BattleMember[] {
   const team = useMemo(() => entry?.team ?? [], [entry]);
   const { index } = usePokemonIndex();
   const nomes = useMemo(() => (index ? namesForIds(team.map((m) => m.national), index) : []), [team, index]);
@@ -66,14 +65,17 @@ const classe = (m: number | null, bom: boolean) =>
 const GymsPage = () => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
-  const entry = useTrainerEntry();
+  const entries = useTrainerEntries();
+  const [selectedRom, setSelectedRom] = useState("");
   const [escolhido, setEscolhido] = useState<Jogo | null>(null);
-  const jogo: Jogo = escolhido ?? (entry?.game === "frlg" ? "frlg" : "emerald");
+  const jogo: Jogo = escolhido ?? (entries[0]?.game === "frlg" ? "frlg" : "emerald");
+  const compatible = entries.filter(entry => (entry.game ?? "emerald") === jogo);
+  const entry = compatible.find(entry => entry.rom === selectedRom) ?? compatible[0];
   const gyms = jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
   const insignias = badgesOf(jogo);
   const doSave = entry && (entry.game ?? "emerald") === jogo ? entry.trainer.badges : null;
   const proximo = nextGym(doSave);
-  const meuTime = useMeuTime();
+  const meuTime = useMeuTime(entry);
 
   return (
     <div className="trainer-shell">
@@ -87,6 +89,13 @@ const GymsPage = () => {
           </select>
         </label>
       </header>
+      <label className="page-selector">{t("Time da aventura", "Adventure team")}
+        <select value={entry?.rom ?? ""} onChange={event => setSelectedRom(event.target.value)} disabled={!compatible.length}>
+          {!compatible.length && <option value="">{t("Sem save compatível — consultando os líderes", "No compatible save — viewing leaders")}</option>}
+          {compatible.map(entry => <option key={entry.rom} value={entry.rom}>{entry.rom.replace(/\.[^.]+$/, "")}</option>)}
+        </select>
+      </label>
+      <p className="page-scope">{t("Guia disponível para Emerald e FireRed/LeafGreen. Só comparamos times de saves do jogo selecionado. Gen 1, Gen 2 e Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
       <p className="trainer-sub">
         {t(
           "Times tirados da decompilação (pret/pokeemerald e pret/pokefirered): a primeira luta de cada líder. Ruby/Sapphire têm times um pouco diferentes.",
@@ -94,7 +103,7 @@ const GymsPage = () => {
         )}{" "}
         {meuTime.length === 0 && (
           <>
-            {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Emulador", "Emulator")}</Link>,{" "}
+            {t("Com um save lido em", "With a save read in")} <Link to="/">{t("Biblioteca", "Library")}</Link>,{" "}
             {t("o seu time aparece contra cada líder.", "your team shows up against each leader.")}
           </>
         )}

@@ -60,7 +60,8 @@ export function parseBackup(text: string): Backup | null {
   if (!v || typeof v !== "object") return null;
   const b = v as Record<string, unknown>;
   if (b.app !== "pokedex" || b.version !== 1 || typeof b.exportedAt !== "string") return null;
-  if (!b.data || typeof b.data !== "object") return null;
+  if (!Number.isFinite(Date.parse(b.exportedAt))) return null;
+  if (!b.data || typeof b.data !== "object" || Array.isArray(b.data)) return null;
   const data = b.data as Record<string, unknown>;
   for (const [k, val] of Object.entries(data)) {
     if (!isSiteKey(k) || typeof val !== "string") return null;
@@ -70,8 +71,21 @@ export function parseBackup(text: string): Backup | null {
 
 /** Troca os dados do site pelos do backup. O que não é do site fica como está. */
 export function applyBackup(s: StorageLike, b: Backup): void {
-  for (const k of chaves(s)) if (isSiteKey(k)) s.removeItem(k);
-  for (const [k, v] of Object.entries(b.data)) s.setItem(k, v);
+  const previous = collectBackup(s);
+  try {
+    for (const k of chaves(s)) if (isSiteKey(k)) s.removeItem(k);
+    for (const [k, v] of Object.entries(b.data)) s.setItem(k, v);
+  } catch (error) {
+    // Libera o backup parcial antes de repor os valores que já cabiam.
+    // localStorage não oferece transação; se também falhar ao repor, informa.
+    try {
+      for (const k of chaves(s)) if (isSiteKey(k)) s.removeItem(k);
+      for (const [k, v] of Object.entries(previous.data)) s.setItem(k, v);
+    } catch {
+      throw new Error("Backup restore and rollback failed", { cause: error });
+    }
+    throw error;
+  }
 }
 
 export interface BackupSummary {
@@ -92,10 +106,10 @@ export function summarize(data: Record<string, string>): BackupSummary {
       return 0;
     }
   };
-  const conhecidas = ["pokedex:favorites", "pokedex:trainer-log", "pokedex:player-dex"];
+  const conhecidas = ["pokedex:favorites", "pokedex:trainer-log", "pokedex:player-dex", "pokedex:legacy-adventures"];
   return {
     favorites: contar("pokedex:favorites", true),
-    trainerCards: contar("pokedex:trainer-log", false),
+    trainerCards: contar("pokedex:trainer-log", false) + contar("pokedex:legacy-adventures", true),
     playerDexes: contar("pokedex:player-dex", false),
     other: Object.keys(data).filter((k) => !conhecidas.includes(k)).length,
   };

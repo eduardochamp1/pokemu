@@ -19,6 +19,6 @@ import { getLoadedRom } from "./core";
  */
 export function usePausedGame(): string | null {
   const { pathname } = useLocation();
-  if (pathname === "/jogar") return null;
+  if (pathname === "/jogar" || pathname === "/") return null;
   return getLoadedRom();
 }

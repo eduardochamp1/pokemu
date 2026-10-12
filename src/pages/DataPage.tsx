@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   applyBackup,
   backupFileName,
@@ -47,28 +48,39 @@ const DataPage = () => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const s = armazenamento();
-  const atual = useMemo(() => (s ? collectBackup(s) : null), [s]);
+  const atual = useMemo(() => {
+    try { return s ? collectBackup(s) : null; } catch { return null; }
+  }, [s]);
   const [vindo, setVindo] = useState<{ nome: string; backup: Backup } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   const exportar = () => {
     if (!s) return;
-    const b = collectBackup(s);
-    const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 1)], { type: "application/json" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = backupFileName();
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setErro(null);
+    try {
+      const b = collectBackup(s);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 1)], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = backupFileName();
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setErro(t("Não foi possível exportar os dados. Verifique o acesso ao armazenamento e tente novamente.", "Could not export data. Check storage access and try again."));
+    }
   };
 
   const ler = async (f: File | undefined) => {
     setErro(null);
     setVindo(null);
     if (!f) return;
-    const b = parseBackup(await f.text());
+    let b: Backup | null;
+    try { b = parseBackup(await f.text()); } catch {
+      setErro(t("Não foi possível ler o arquivo. Escolha o backup novamente.", "Could not read the file. Select the backup again."));
+      return;
+    }
     if (!b) {
-      setErro(t("Este arquivo não é um backup de dados deste site.", "This file isn't a data backup from this site."));
+      setErro(t("Este arquivo não é um backup de aventuras do Pokemu.", "This file isn't a Pokemu adventure backup."));
       return;
     }
     setVindo({ nome: f.name, backup: b });
@@ -76,7 +88,12 @@ const DataPage = () => {
 
   const importar = () => {
     if (!s || !vindo) return;
-    applyBackup(s, vindo.backup);
+    try { applyBackup(s, vindo.backup); } catch (error) {
+      setErro(error instanceof Error && error.message === "Backup restore and rollback failed"
+        ? t("A restauração falhou e não foi possível repor todos os dados anteriores. Mantenha seus arquivos de backup e confira o armazenamento disponível.", "Restore failed and some previous data could not be recovered. Keep your backup files and check available storage.")
+        : t("Não foi possível restaurar o backup. Os dados anteriores foram mantidos; verifique o espaço disponível.", "Could not restore the backup. Previous data was retained; check available storage."));
+      return;
+    }
     // Os stores leem o localStorage ao carregar: recarregar é o jeito honesto
     // de todas as páginas verem os dados novos.
     window.location.reload();
@@ -85,7 +102,7 @@ const DataPage = () => {
   if (!s || !atual) {
     return (
       <div className="trainer-shell">
-        <h1>{t("Seus dados", "Your data")}</h1>
+        <h1>{t("Backup e restauração", "Backup and restore")}</h1>
         <p className="trainer-vazio">
           {t("Este navegador não deixa o site guardar dados (modo privado?).", "This browser doesn't let the site store data (private mode?).")}
         </p>
@@ -96,14 +113,16 @@ const DataPage = () => {
   return (
     <div className="trainer-shell">
       <header className="trainer-header">
-        <h1>{t("Seus dados", "Your data")}</h1>
+        <h1>{t("Backup e restauração", "Backup and restore")}</h1>
       </header>
       <p className="trainer-sub">
         {t(
-          "Tudo fica neste navegador — não há conta nem servidor. Para usar em outro aparelho, exporte aqui e importe o arquivo lá. Os saves do emulador não entram: eles têm o próprio backup no emulador.",
-          "Everything lives in this browser — no account, no server. To use it on another device, export here and import the file there. Emulator saves aren't included: they have their own backup in the emulator."
+          "Exporte histórico, fichas, diário, objetivos, favoritos, nomes dos pontos de retorno e detonados cadastrados em um arquivo JSON. Ele não inclui ROMs, saves .sav nem os arquivos dos pontos de retorno da partida.",
+          "Export history, cards, journal, goals, favorites, restore point names and imported walkthroughs as JSON. It does not include ROMs, .sav saves or actual game restore point files."
         )}
       </p>
+      <p className="page-scope">{t("Para guardar o progresso jogável, exporte também o save .sav na área de jogo.", "To keep playable progress, also export the .sav save from the game workspace.")}{" "}<Link to="/?area=jogar&painel=saves">{t("Abrir saves →", "Open saves →")}</Link></p>
+      {erro && <p className="dados-erro" role="alert">{erro}</p>}
 
       <section className="dados-bloco" aria-labelledby="dados-exportar">
         <h2 id="dados-exportar">{t("Neste navegador", "In this browser")}</h2>
@@ -119,11 +138,6 @@ const DataPage = () => {
           {t("Arquivo exportado (.json)", "Exported file (.json)")}
           <input type="file" accept=".json,application/json" onChange={(e) => void ler(e.target.files?.[0])} />
         </label>
-        {erro && (
-          <p className="dados-erro" role="alert">
-            {erro}
-          </p>
-        )}
         {vindo && (
           <div className="dados-confirmar">
             <p>

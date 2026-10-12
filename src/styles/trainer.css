@@ -41,6 +41,10 @@
 .trainer-sub a { color: var(--accent); }
 .trainer-vazio { color: var(--text-muted); max-width: 60ch; }
 .trainer-vazio a { color: var(--accent); }
+.page-selector { display: grid; gap: 8px; color: var(--text-muted); font-size: .85rem; }
+.page-selector select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; color: var(--text); background: var(--surface-1); font-size: .9rem; }
+.page-scope { font-size: .85rem; line-height: 1.7; padding: 16px 18px; background: var(--surface-1); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; color: var(--text-muted); }
+.page-scope a { color: var(--accent); }
 
 /* O cartão: papel, como as cartas da Pokédex. */
 .trainer-card {

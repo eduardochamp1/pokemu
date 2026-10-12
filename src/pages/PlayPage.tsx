@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { useSearchParams } from "react-router-dom";
 import "../styles/play.css";
 import { useEmulator } from "../emulator/useEmulator";
+import { compareRomsChronologically, romRelease } from "../emulator/romChronology";
 import {
   GROUP_LABELS,
   GROUP_LABELS_EN,
@@ -42,6 +43,10 @@ import ScreenshotThumb from "../components/ScreenshotThumb";
 import PokedexLink from "../components/PokedexLink";
 import { temPokedex } from "../lib/pokedexSite";
 import PlayTeam from "../components/PlayTeam";
+import LegacySavePanel from "../components/LegacySavePanel";
+import GameLibrary from "../components/GameLibrary";
+import AdventureJournal from "../components/AdventureJournal";
+import SlotName from "../components/SlotName";
 import { localeOf, useLang, tr, type Lang } from "../i18n/lang";
 import { generationLabel } from "../i18n/common";
 
@@ -110,7 +115,15 @@ const PlayPage = () => {
    * fica calado de proposito: o site nao distribui ROM e nao pode prometer um
    * jogo que quem chegou aqui talvez nao tenha.
    */
-  const [searchParams] = useSearchParams();
+  const [searchParams, setWorkspaceParams] = useSearchParams();
+  const libraryView = searchParams.get("area") !== "jogar";
+  const panelParam = searchParams.get("painel");
+  const sidebarArea = panelParam === "saves" || panelParam === "settings" ? panelParam : "adventure";
+  const setSidebarArea = (area: "adventure" | "saves" | "settings") => setWorkspaceParams(previous => {
+    const next = new URLSearchParams(previous);
+    next.set("painel", area);
+    return next;
+  });
   const jogoPedido = searchParams.get("jogo") ?? undefined;
   const romPedida = jogoPedido
     ? emu.roms.find((r) => r.versionGroupId === jogoPedido)?.fileName
@@ -126,11 +139,31 @@ const PlayPage = () => {
   const [capturing, setCapturing] = useState<string | null>(null);
   /** ROM com a remoção pendente de confirmação, ou null. */
   const [removing, setRemoving] = useState<string | null>(null);
-  const gamepadName = useGamepad(emu.gamepadApi, playing);
+  const gamepadName = useGamepad(emu.gamepadApi, playing && !libraryView);
   // Avulsas para o efeito dos atalhos: cada uma é estável por si, ao contrário
   // do objeto `emu`, que é novo a cada render.
   const { bindings, setTurbo, setRewinding, saveState, loadState } = emu;
   const { setInputEnabled, notify, rebindKey } = emu;
+  const { pause } = emu;
+  useEffect(() => {
+    if (libraryView && emu.status.kind === "running") pause();
+    setInputEnabled(!libraryView && !isTypingTarget(document.activeElement));
+  }, [libraryView, emu.status.kind, pause, setInputEnabled]);
+
+  const showWorkspace = (area: "biblioteca" | "jogar") => {
+    setCapturing(null);
+    if (area === "jogar" && emu.status.kind === "paused") emu.resume();
+    setWorkspaceParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (area === "jogar") next.set("area", "jogar");
+      else next.delete("area");
+      return next;
+    });
+  };
+  const libraryGames = [
+    ...(emu.localRoms ?? []).map(rom => ({ ...rom, local: true })),
+    ...emu.roms.filter(rom => !emu.localRoms?.some(local => local.fileName === rom.fileName)).map(rom => ({ ...rom, local: false })),
+  ];
 
   // Enquanto captura, o core não pode receber o teclado: a tecla que está
   // sendo escolhida iria para o jogo junto. `toggleInput(false)` desliga a
@@ -189,15 +222,15 @@ const PlayPage = () => {
 
   /** Assim que o jogo passa a rodar, o teclado é dele. */
   useEffect(() => {
-    if (playing && !capturing) focarPalco();
-  }, [playing, capturing, focarPalco]);
+    if (playing && !capturing && !libraryView) focarPalco();
+  }, [playing, capturing, libraryView, focarPalco]);
 
   /**
    * Atalhos de teclado. Só com jogo carregado, e nunca enquanto a tela espera
    * uma tecla nova — ali a próxima tecla é a escolha, não um comando.
    */
   useEffect(() => {
-    if (!playing || capturing) return;
+    if (!playing || capturing || libraryView) return;
     const boundKeys = new Set(bindings.map((b) => b.sdlKey));
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -253,7 +286,7 @@ const PlayPage = () => {
     // Dependências avulsas, e não o objeto `emu`: ele é recriado a cada render,
     // e com ele na lista a limpeza rodava toda renderização — o turbo ligava e
     // era desligado no mesmo instante pelo próprio efeito.
-  }, [playing, capturing, bindings, setTurbo, setRewinding, saveState, loadState]);
+  }, [playing, capturing, libraryView, bindings, setTurbo, setRewinding, saveState, loadState]);
 
   /**
    * Arquivo solto fora da moldura.
@@ -278,24 +311,28 @@ const PlayPage = () => {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) void emu.playFile(file);
+    if (file) { showWorkspace("jogar"); void emu.playFile(file); }
   };
 
   return (
-    <div className="play-shell">
+    <div className="play-shell" onFocusCapture={event => {
+      if (isTypingTarget(event.target)) setInputEnabled(false);
+    }} onBlurCapture={event => {
+      if (isTypingTarget(event.target) && !isTypingTarget(event.relatedTarget) && !libraryView && !capturing) setInputEnabled(true);
+    }}>
       <header className="play-header">
         <div>
-          <h1>{tx("Jogar", "Play")}</h1>
+          <h1>{libraryView ? tx("Biblioteca", "Library") : tx("Sua aventura", "Your adventure")}</h1>
           <p className="play-sub">
             {en
-              ? `${SUPPORTED_LABEL_EN} emulator running in the browser.`
-              : `Emulador ${SUPPORTED_LABEL} rodando no navegador.`}
-            {emu.version && <span className="play-core"> {emu.version}</span>}
+              ? `Your games and progress, together. ${SUPPORTED_LABEL_EN}.`
+              : `Seus jogos e seu progresso, juntos. ${SUPPORTED_LABEL}.`}
+            {emu.version && <span className="play-core" hidden> {emu.version}</span>}
           </p>
         </div>
-        {playing && (
+        {playing && !libraryView && (
           <div className="play-now">
-            <span className="play-now-label">{tx("Rodando", "Running")}</span>
+            <span className="play-now-label">{emu.status.kind === "paused" ? tx("Em pausa", "Paused") : tx("Rodando", "Running")}</span>
             {/* O nome do arquivo manda na linha principal, e isso é regra, não
                 estilo: romhack tem o cabeçalho byte a byte igual ao do jogo
                 original, então o detectado só pode vir como base. Escrever
@@ -327,6 +364,10 @@ const PlayPage = () => {
           </div>
         )}
       </header>
+      <nav className="workspace-nav" aria-label={tx("Área de jogos", "Game workspace")}>
+        <button aria-current={libraryView ? "page" : undefined} onClick={() => showWorkspace("biblioteca")}>{tx("Biblioteca", "Library")} <span>{libraryGames.length}</span></button>
+        <button aria-current={!libraryView ? "page" : undefined} onClick={() => showWorkspace("jogar")}>{tx("Jogar", "Play")}{playing && <span>●</span>}</button>
+      </nav>
 
       {emu.status.kind === "unsupported" && (
         <section className="play-diag" role="alert">
@@ -371,7 +412,18 @@ const PlayPage = () => {
         </div>
       )}
 
-      <div className="play-layout">
+      <div hidden={!libraryView}><GameLibrary games={libraryGames} currentRom={currentRom} loading={emu.status.kind === "checking" || emu.status.kind === "loading" || emu.status.kind === "unsupported"}
+        onPlay={game => {
+          showWorkspace("jogar");
+          if (game.fileName !== currentRom) {
+            if (game.local) void emu.playLocal(game.fileName);
+            else void emu.playStored(game.fileName);
+          }
+        }}
+        onContinue={() => showWorkspace("jogar")}
+        onImport={() => romInputRef.current?.click()}
+        onRefresh={() => void emu.refreshLocalRoms()} /></div>
+      <div className="play-layout" hidden={libraryView}>
         <div className="play-stage">
           {/* Carcaca: lente, LEDs e grelha em volta da tela. E moldura —
               nada aqui recebe foco nem cobre o canvas. */}
@@ -619,8 +671,14 @@ const PlayPage = () => {
         </div>
 
         <aside className="play-sidebar">
+          <nav className="sidebar-nav" aria-label={tx("Painel da partida", "Game panel")}>
+            {([ ["adventure", tx("Aventura", "Adventure")], ["saves", tx("Saves", "Saves")], ["settings", tx("Ajustes", "Settings")] ] as const).map(([area, label]) => <button key={area} aria-current={sidebarArea === area ? "page" : undefined} onClick={() => setSidebarArea(area)}>{label}</button>)}
+          </nav>
+          <div hidden={sidebarArea !== "adventure"}>
+          <details className="play-library-tools">
+            <summary>{tx("Trocar ou adicionar jogo", "Change or add a game")}</summary>
           <section className="play-panel">
-            <h2>{tx("Carregar", "Load")}</h2>
+            <h2>{tx("Trocar de jogo", "Change game")}</h2>
             <button
               type="button"
               className="play-primary"
@@ -642,7 +700,7 @@ const PlayPage = () => {
               hidden
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) void emu.playFile(file);
+                if (file) { showWorkspace("jogar"); void emu.playFile(file); }
                 e.target.value = "";
               }}
             />
@@ -656,7 +714,7 @@ const PlayPage = () => {
 
           <section className="play-panel">
             <div className="play-panel-head">
-              <h2>{tx("Pasta roms/", "roms/ folder")}</h2>
+              <h2>{tx("Jogos do computador", "Games on this computer")}</h2>
               {/* Reler não faz sentido onde a pasta não existe (produção). */}
               {emu.localRoms !== null && (
                 <button
@@ -688,7 +746,7 @@ const PlayPage = () => {
               </p>
             ) : emu.localRoms.length > 0 ? (
               <ul className="play-rom-list">
-                {emu.localRoms.map((rom) => (
+                {emu.localRoms.slice().sort(compareRomsChronologically).map((rom) => (
                   <li key={rom.fileName}>
                     <button
                       type="button"
@@ -697,6 +755,7 @@ const PlayPage = () => {
                     >
                       <span className="play-rom-name">{rom.fileName}</span>
                       <span className="play-rom-meta">
+                        {romRelease(rom.fileName)?.date.slice(0, 4) ?? tx("Data não cadastrada", "Release date unknown")} · {" "}
                         {consoleOf(rom.fileName)} · {formatBytes(rom.size)}
                       </span>
                     </button>
@@ -708,20 +767,23 @@ const PlayPage = () => {
                 {en ? (
                   <>
                     Empty. Drop your <code>.gb</code>, <code>.gbc</code> or{" "}
-                    <code>.gba</code> files into <code>roms/</code> at the project root — in
+                    <code>.gba</code> files into <code>roms/</code>{" "}
+                    {location.protocol === "pokemu:" ? "(Pokemu menu → Open ROMs folder) — in" : "at the project root — in"}
                     subfolders too — and they show up here, one click away.
                   </>
                 ) : (
                   <>
                     Vazia. Largue seus <code>.gb</code>, <code>.gbc</code> ou{" "}
-                    <code>.gba</code> em <code>roms/</code> na raiz do projeto — em
+                    <code>.gba</code> em <code>roms/</code>{" "}
+                    {location.protocol === "pokemu:" ? "(menu Pokemu → Abrir pasta de ROMs) — em" : "na raiz do projeto — em"}
                     subpastas também — e eles aparecem aqui, prontos para um clique.
                   </>
                 )}
               </p>
             )}
             <p className="play-panel-hint">
-              {tx(
+              {tx("Ordem de lançamento original dos títulos; jogos sem data cadastrada aparecem ao final.", "Titles sorted by original release; games without a known release date appear last.")}{" "}
+              {location.protocol === "pokemu:" ? tx("Use o menu Pokemu para abrir suas pastas de ROMs e saves.", "Use the Pokemu menu to open your ROM and save folders.") : tx(
                 "Fora do git e fora do build: os arquivos ficam só na sua máquina.",
                 "Outside git and outside the build: the files stay on your machine only."
               )}
@@ -732,7 +794,7 @@ const PlayPage = () => {
             <section className="play-panel">
               <h2>{tx("Na sua biblioteca", "In your library")}</h2>
               <ul className="play-rom-list">
-                {emu.roms.map((rom) => (
+                {emu.roms.slice().sort(compareRomsChronologically).map((rom) => (
                   <li key={rom.fileName} className="play-rom-row">
                     <button
                       type="button"
@@ -747,6 +809,7 @@ const PlayPage = () => {
                     >
                       <span className="play-rom-name">{rom.fileName}</span>
                       <span className="play-rom-meta">
+                        {romRelease(rom.fileName)?.date.slice(0, 4) ?? tx("Data não cadastrada", "Release date unknown")} · {" "}
                         {consoleOf(rom.fileName)}
                         {rom.base && ` · base: ${rom.base}`}
                         {rom.size !== undefined && ` · ${formatBytes(rom.size)}`}
@@ -804,9 +867,13 @@ const PlayPage = () => {
             </section>
           )}
 
+          </details>
           {/* O save vira fonte de dados do site: os ids nacionais saem
               dele e entram no mesmo hook que a grade usa. */}
-          <PlayTeam team={emu.team} lido={emu.teamLido} />
+          {emu.legacySave ? <LegacySavePanel save={emu.legacySave} /> : <PlayTeam team={emu.team} lido={emu.teamLido} />}
+          {currentRom && <AdventureJournal key={currentRom} rom={currentRom} />}
+          </div>
+          <div hidden={sidebarArea !== "saves"}>
 
           {/* A captura virava download e sumia — mas o PNG ficava no FS e nada
               nunca o apagava, então a cota crescia sozinha e invisível. Aqui
@@ -859,7 +926,8 @@ const PlayPage = () => {
           )}
 
           <section className="play-panel">
-            <h2>Save states</h2>
+            <h2>{tx("Pontos de retorno", "Restore points")}</h2>
+            <p className="play-panel-hint">{tx("Guarde o momento exato da partida para voltar a ele depois.", "Keep the exact moment in your game to return to it later.")}</p>
 
             {/* O core vinha capturando um estado a cada 30 s e nunca o
                 oferecia. Aqui ele vira o caminho de volta ao jogo. */}
@@ -952,6 +1020,7 @@ const PlayPage = () => {
                   >
                     ✕
                   </button>
+                  {currentRom && <SlotName key={`${currentRom}:${info.slot}`} rom={currentRom} slot={info.slot} />}
                 </div>
               ))}
             </div>
@@ -963,7 +1032,7 @@ const PlayPage = () => {
           </section>
 
           <section className="play-panel">
-            <h2>Saves</h2>
+            <h2>{tx("Progresso do jogo", "Game progress")}</h2>
             <div className="play-save-actions">
               <button
                 type="button"
@@ -1103,6 +1172,8 @@ const PlayPage = () => {
             )}
           </section>
 
+          </div>
+          <div hidden={sidebarArea !== "settings"}>
           <section className="play-panel">
             <h2>{tx("Áudio e vídeo", "Audio and video")}</h2>
             <div className="play-av">
@@ -1236,6 +1307,7 @@ const PlayPage = () => {
               </div>
             </dl>
           </section>
+          </div>
         </aside>
       </div>
     </div>

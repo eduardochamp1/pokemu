@@ -14,13 +14,13 @@ const Navbar = () => {
   const t = useT();
   return (
     <nav className="navbar">
-      <Link to="/" aria-label={t("Ir para o emulador", "Go to the emulator")} className="navbar-brand">
+      <Link to="/" aria-label={t("Ir para a biblioteca", "Go to the library")} className="navbar-brand">
         <span className="navbar-pokeball" aria-hidden="true" />
         <span className="navbar-title">Pokemu</span>
       </Link>
       <div className="nav-links">
         <NavLink to="/" end className={classe}>
-          {t("Emulador", "Emulator")}
+          {t("Jogos", "Games")}
           {pausado && (
             <span
               className="nav-paused"
@@ -32,16 +32,17 @@ const Navbar = () => {
           )}
         </NavLink>
         <NavLink to="/treinador" className={classe}>
-          {t("Treinador", "Trainer")}
+          {t("Aventuras", "Adventures")}
         </NavLink>
         <NavLink to="/ginasios" className={classe}>
           {t("Ginásios", "Gyms")}
         </NavLink>
+        <NavLink to="/ajuda" className={classe}>{t("Ajuda", "Help")}</NavLink>
         <NavLink to="/dano" className={classe}>
-          {t("Dano", "Damage")}
+          {t("Planejar batalhas", "Plan battles")}
         </NavLink>
         <NavLink to="/dados" className={classe}>
-          {t("Dados", "Data")}
+          {t("Backup", "Backup")}
         </NavLink>
       </div>
       <LangToggle />

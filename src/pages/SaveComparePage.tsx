@@ -74,9 +74,10 @@ const SaveComparePage = () => {
       <header className="trainer-header">
         <h1>{t("Comparar saves", "Compare saves")}</h1>
         <span className="trainer-rom">
-          <Link to="/treinador">{t("← Treinador", "← Trainer")}</Link>
+          <Link to="/treinador">{t("← Minhas aventuras", "← My adventures")}</Link>
         </span>
       </header>
+      <p className="page-scope">{t("Comparação disponível para saves da Gen 3. Arquivos escolhidos aqui são apenas consultados: não substituem seu progresso nem entram na linha do tempo.", "Comparison available for Gen 3 saves. Files selected here are read only: they do not replace progress or enter the timeline.")}</p>
 
       <div className="savecmp-lados">
         <EscolherLado titulo="A" fichas={fichas} atual={a} onChange={setLadoA} />
@@ -191,8 +192,14 @@ const EscolherLado = ({ titulo, fichas, atual, onChange }: EscolherProps) => {
   const carregar = async (f: File | undefined) => {
     if (!f) return;
     setErro(null);
-    const save = parseGen3Save(new Uint8Array(await f.arrayBuffer()));
-    const entry = save ? entryFromSave(f.name, save) : null;
+    let entry: TrainerEntry | null;
+    try {
+      const save = parseGen3Save(new Uint8Array(await f.arrayBuffer()));
+      entry = save ? entryFromSave(f.name, save) : null;
+    } catch {
+      setErro(t("Não foi possível ler o arquivo. Escolha o save novamente.", "Could not read the file. Select the save again."));
+      return;
+    }
     if (!entry) {
       setErro(t("Não é um save de Gen 3 que o site entenda.", "Not a Gen 3 save the site understands."));
       return;

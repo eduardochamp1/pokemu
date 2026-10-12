@@ -53,7 +53,7 @@ class ErrorBoundary extends Component<Props, State> {
           >
             {t("Tentar de novo", "Try again")}
           </button>
-          <a href="/">{t("Ir para o emulador", "Go to the emulator")}</a>
+          <a href="/">{t("Voltar à biblioteca", "Back to library")}</a>
         </div>
       </div>
     );

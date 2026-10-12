@@ -41,6 +41,10 @@ const dublê = vi.hoisted(() => ({
   syncFalha: false,
   /** Faz `loadGame` recusar, como acontece com ROM corrompida. */
   loadFalha: false,
+  rom: null as string | null,
+  save: null as Uint8Array | null,
+  header: null as Uint8Array | null,
+  saveCallback: null as (() => void) | null,
 }));
 const multiplicadores = dublê.multiplicadores;
 
@@ -75,6 +79,17 @@ vi.mock("./core", () => {
     loadGame: () => !dublê.loadFalha,
     filePaths: () => ({ gamePath: "/data/games", screenshotsPath: "/data/shots" }),
     saveStateSlot: () => true,
+    getSave: () => dublê.save,
+    addCoreCallbacks: (callbacks: { saveDataUpdatedCallback?: () => void }) => { dublê.saveCallback = callbacks.saveDataUpdatedCallback ?? null; },
+    FS: {
+      open: () => ({}),
+      close: () => undefined,
+      read: (_stream: unknown, buffer: Uint8Array) => {
+        if (!dublê.header) return 0;
+        buffer.set(dublê.header);
+        return dublê.header.length;
+      },
+    },
   };
   const core = new Proxy(registrado, {
     get: (alvo, prop) => {
@@ -100,7 +115,7 @@ vi.mock("./core", () => {
     coreVersion: () => "stub",
     getCanvas: () => document.createElement("canvas"),
     getCore: () => Promise.resolve(core),
-    getLoadedRom: () => null,
+    getLoadedRom: () => dublê.rom,
     setLoadedRom: () => undefined,
     getWasRunning: () => false,
     setWasRunning: () => undefined,
@@ -120,6 +135,8 @@ vi.mock("./saveStates", async (original) => ({
 
 import { useEmulator } from "./useEmulator";
 import { TURBO_MULTIPLIER } from "./shortcuts";
+import { legacyFixture } from "./saveParse/legacy.fixture";
+import { reloadLegacyAdventures } from "../lib/legacyAdventures";
 
 /**
  * Monta o hook e espera o core dublê ser adotado.
@@ -148,7 +165,34 @@ beforeEach(() => {
   dublê.chamadas.length = 0;
   dublê.syncFalha = false;
   dublê.loadFalha = false;
+  dublê.rom = null;
+  dublê.save = null;
+  dublê.header = null;
+  dublê.saveCallback = null;
   window.localStorage.clear();
+  reloadLegacyAdventures();
+});
+
+it("integrates cartridge detection, Gen 2 reading and persisted adventures on save callbacks", async () => {
+  const fixture = legacyFixture("gold");
+  const header = new Uint8Array(0x150);
+  header.set(Array.from("POKEMON_GLDAAUE", c => c.charCodeAt(0)), 0x134);
+  header[0x143] = 128; header[0x14a] = 1;
+  for (let i = 0x134; i <= 0x14c; i++) header[0x14d] = (header[0x14d] - header[i] - 1) & 255;
+  dublê.header = header; dublê.rom = "gold.gbc"; dublê.save = fixture.bytes;
+  const emu = await montar();
+  await waitFor(() => expect(emu.atual.legacySave?.playerName).toBe("ASH"));
+  expect(emu.atual.team).toBeNull();
+  expect(JSON.parse(localStorage.getItem("pokedex:legacy-adventures")!)[0].save.party[0].dvs.atk).toBe(2);
+  fixture.bytes[fixture.offsets.badges] |= 2;
+  fixture.checksum();
+  await act(async () => { dublê.saveCallback?.(); });
+  expect(emu.atual.legacySave?.trainer.badges[1]).toBe(true);
+  expect(JSON.parse(localStorage.getItem("pokedex:legacy-adventures")!)[0].events.at(-1)).toMatchObject({ kind: "badge", value: 1 });
+  dublê.save = new Uint8Array(0x8000);
+  await act(async () => { dublê.saveCallback?.(); });
+  expect(emu.atual.legacySave).toBeNull();
+  expect(JSON.parse(localStorage.getItem("pokedex:legacy-adventures")!)[0].save.playerName).toBe("ASH");
 });
 
 /**

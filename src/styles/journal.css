@@ -1,0 +1,23 @@
+.adventure-journal { border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: var(--surface-1); display: grid; gap: 14px; }
+.adventure-journal h2 { font-family: var(--font-display); font-size: 1rem; }
+.adventure-journal form, .adventure-journal form label { display: grid; gap: 8px; font-size: .85rem; }
+.adventure-journal input:not([type=checkbox]), .adventure-journal textarea, .slot-name-form input, .help-search { min-width: 0; width: 100%; padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 7px; font-family: inherit; }
+.adventure-journal textarea { min-height: 95px; resize: vertical; }
+.adventure-journal button, .help-actions button, .slot-name-form button { padding: 9px 12px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 7px; font-size: .8rem; }
+.adventure-journal button:disabled { opacity: .5; cursor: default; }
+.journal-goals, .journal-notes { list-style: none; display: grid; gap: 12px; }
+.journal-goals label { display: flex; align-items: center; gap: 10px; font-size: .85rem; }
+.journal-goals .is-done { text-decoration: line-through; color: var(--text-dim); }
+.journal-notes li { border-top: 1px solid var(--border); padding-top: 12px; }
+.journal-notes time { font-size: .7rem; color: var(--text-dim); }
+.journal-notes p, .guide-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.8; }
+.journal-help { font-size: .85rem; color: var(--accent); }
+.slot-name, .slot-name-form { grid-column: 1 / -1; }
+.slot-name { text-align: left; color: var(--accent); padding: 8px; font-size: .8rem; overflow-wrap: anywhere; }
+.slot-name-form { display: flex; gap: 5px; flex-wrap: wrap; padding: 8px 0; }
+.help-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: .85rem; }
+.guide-result { border-top: 1px solid var(--border); padding: 16px 0; }
+.guide-result summary { cursor: pointer; font-size: .9rem; color: var(--accent); padding: 8px 0; }
+.walkthrough-sources { list-style: none; display: grid; gap: 12px; }
+.walkthrough-sources li { display: grid; gap: 6px; border-top: 1px solid var(--border); padding-top: 12px; overflow-wrap: anywhere; }
+.walkthrough-sources li > p { font-size: .85rem; }

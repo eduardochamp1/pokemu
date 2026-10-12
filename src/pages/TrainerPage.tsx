@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PokedexLink from "../components/PokedexLink";
-import { useTrainerEntry } from "../lib/trainerLog";
+import { useTrainerEntries } from "../lib/trainerLog";
 import {
   describeEvent,
   formatMoney,
@@ -15,6 +15,10 @@ import PokemonMini from "../components/PokemonMini";
 import PcBoxes from "../components/PcBoxes";
 import Achievements from "../components/Achievements";
 import TrainerCardShare from "../components/TrainerCardShare";
+import LegacyAdventures from "../components/LegacyAdventures";
+import AdventureJournal from "../components/AdventureJournal";
+import { usePersonalAdventures } from "../lib/personalAdventures";
+import { useLegacyAdventures } from "../lib/legacyAdventures";
 import { pokemonLabel } from "../lib/pokemonLabel";
 import { TOTAL_DA_DEX_GEN3 } from "../lib/playerDex";
 import "../styles/trainer.css";
@@ -26,7 +30,17 @@ import { localeOf, useLang, tr } from "../i18n/lang";
  * do que o `/jogar` gravou da última vez que leu o save.
  */
 const TrainerPage = () => {
-  const entry = useTrainerEntry();
+  const entries = useTrainerEntries();
+  const legacyEntries = useLegacyAdventures();
+  const personal = usePersonalAdventures();
+  const [selectedRom, setSelectedRom] = useState("");
+  const adventures = [
+    ...entries.map(entry => ({ key: `gen3:${entry.rom}`, rom: entry.rom, updatedAt: entry.updatedAt })),
+    ...legacyEntries.map(entry => ({ key: `legacy:${entry.rom}`, rom: entry.rom, updatedAt: entry.updatedAt })),
+    ...personal.filter(entry => (entry.notes.length || entry.goals.length || entry.guide) && !entries.some(saved => saved.rom === entry.rom) && !legacyEntries.some(saved => saved.rom === entry.rom)).map(entry => ({ key: `personal:${entry.rom}`, rom: entry.rom, updatedAt: Math.max(0, ...entry.notes.map(note => note.at), ...entry.goals.map(goal => goal.at)) })),
+  ].sort((a, b) => b.updatedAt - a.updatedAt);
+  const selected = adventures.find(entry => entry.key === selectedRom) ?? adventures[0];
+  const entry = selected?.key.startsWith("gen3:") ? entries.find(entry => entry.rom === selected.rom) : undefined;
   const lang = useLang();
   // `t` aqui é o treinador; a tradução se chama `tx`.
   const tx = (pt: string, en: string) => tr(lang, pt, en);
@@ -46,19 +60,29 @@ const TrainerPage = () => {
     [slugOf]
   );
   const slugDe = useCallback((n: number) => slugOf.get(n), [slugOf]);
+  const selector = adventures.length > 0 && <label className="page-selector">
+    {tx("Aventura acompanhada", "Tracked adventure")}
+    <select value={selected?.key ?? ""} onChange={event => setSelectedRom(event.target.value)}>
+      {adventures.map(adventure => <option key={adventure.key} value={adventure.key}>{adventure.rom.replace(/\.[^.]+$/, "")}</option>)}
+    </select>
+  </label>;
 
   if (!entry) {
     return (
       <div className="trainer-shell">
         <header className="trainer-header">
-          <h1>{tx("Treinador", "Trainer")}</h1>
+          <h1>{tx("Minhas aventuras", "My adventures")}</h1>
+          <span className="trainer-rom"><Link to="/treinador/comparar">{tx("Comparar saves da Gen 3", "Compare Gen 3 saves")}</Link></span>
         </header>
+        {selector}
+        <LegacyAdventures selectedRom={selected?.rom} />
+        {selected && <AdventureJournal key={selected.rom} rom={selected.rom} />}
+        {legacyEntries.length === 0 &&
         <p className="trainer-vazio">
           {tx("Ainda não há ficha. Ela nasce do save de", "No card yet. It comes from the save of")}{" "}
-          <strong>Emerald</strong>, <strong>FireRed/LeafGreen</strong>{" "}
-          {tx("ou", "or")} <strong>Ruby/Sapphire</strong>{" "}
-          {tx("aberto em", "opened in")} <Link to="/">{tx("Emulador", "Emulator")}</Link>.
-        </p>
+          <strong>{tx("um jogo de Gen 1, Gen 2 ou Gen 3 da biblioteca", "a Gen 1, Gen 2 or Gen 3 game from the library")}</strong>{" "}
+          {tx("aberto em", "opened in")} <Link to="/">{tx("Biblioteca", "Library")}</Link>. {tx("Salve pelo menu do jogo para iniciar o acompanhamento.", "Save from the game's menu to start tracking.")}
+        </p>}
       </div>
     );
   }
@@ -74,12 +98,16 @@ const TrainerPage = () => {
   return (
     <div className="trainer-shell">
       <header className="trainer-header">
-        <h1>{tx("Treinador", "Trainer")}</h1>
+        <h1>{tx("Minhas aventuras", "My adventures")}</h1>
         <span className="trainer-rom">
-          <Link to="/">{entry.rom.replace(/\.[^.]+$/, "")}</Link> · {gameLabel(game)} ·{" "}
+          {entry.rom.replace(/\.[^.]+$/, "")} · {gameLabel(game)} ·{" "}
           <Link to="/treinador/comparar">{tx("comparar saves", "compare saves")}</Link>
         </span>
       </header>
+
+      {selector}
+      <AdventureJournal key={entry.rom} rom={entry.rom} />
+      <p className="trainer-sub">{tx("Dados da última gravação lida deste jogo. Troque a aventura acima para consultar outro progresso.", "Data from this game's last recorded save. Select another adventure above to view other progress.")}</p>
 
       <section className="trainer-card" aria-label={tx("Cartão de treinador", "Trainer card")}>
         <div className="trainer-card-nome">

@@ -44,9 +44,9 @@ const NotFoundPage = () => {
     </p>
     <div className="notfound-links">
       <Link to="/" className="notfound-cta">
-        {t("Ir para o emulador →", "Go to the emulator →")}
+        {t("Voltar à biblioteca →", "Back to library →")}
       </Link>
-      <Link to="/treinador">{t("Treinador", "Trainer")}</Link>
+      <Link to="/treinador">{t("Minhas aventuras", "My adventures")}</Link>
       <Link to="/ginasios">{t("Ginásios", "Gyms")}</Link>
     </div>
   </div>

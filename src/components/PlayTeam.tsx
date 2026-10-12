@@ -37,8 +37,8 @@ const PlayTeam = ({ team, lido }: Props) => {
         <h2>{t("Seu time", "Your team")}</h2>
         <p className="play-panel-hint">
           {t(
-            "Não deu para ler o time deste save. O leitor entende save de bateria de Gen 3 (Ruby, Sapphire, Emerald, FireRed, LeafGreen); romhack e outras gerações guardam o progresso de outro jeito.",
-            "Couldn't read the team from this save. The reader understands Gen 3 battery saves (Ruby, Sapphire, Emerald, FireRed, LeafGreen); romhacks and other generations store progress differently."
+            "Ainda não há um save de bateria válido para ler. Salve pelo menu do jogo. O leitor atende os jogos oficiais de Gen 1, Gen 2 e Gen 3 da biblioteca; romhacks e outras edições podem usar formatos diferentes.",
+            "There is no valid battery save to read yet. Save from the game's menu. The reader supports the library's official Gen 1, Gen 2 and Gen 3 games; romhacks and other editions may use different formats."
           )}
         </p>
       </section>

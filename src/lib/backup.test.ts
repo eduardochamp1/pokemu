@@ -46,9 +46,26 @@ describe("parseBackup", () => {
     // Chave de fora do site dentro do arquivo não entra.
     expect(parseBackup(JSON.stringify({ app: "pokedex", version: 1, exportedAt: "x", data: { "outra": "1" } }))).toBeNull();
   });
+  it("recusa data inválida e uma lista no lugar dos dados", () => {
+    const base = { app: "pokedex", version: 1, exportedAt: new Date(0).toISOString(), data: {} };
+    expect(parseBackup(JSON.stringify({ ...base, exportedAt: "invalid" }))).toBeNull();
+    expect(parseBackup(JSON.stringify({ ...base, data: [] }))).toBeNull();
+  });
 });
 
 describe("applyBackup", () => {
+  it("repõe os dados anteriores se a gravação falhar após importar uma chave", () => {
+    const original = { "pokedex:trainer-log": "old", "other": "keep", "pokedex:emulator:last-rom": "red.gb" };
+    const s = armazenamento(original);
+    const normalWrite = s.setItem;
+    let failed = false;
+    s.setItem = (key, value) => {
+      if (key === "pokedex:second" && !failed) { failed = true; throw new Error("quota"); }
+      normalWrite(key, value);
+    };
+    expect(() => applyBackup(s, { app: "pokedex", version: 1, exportedAt: "", data: { "pokedex:first": "new", "pokedex:second": "new" } })).toThrow("quota");
+    expect(s.dump()).toEqual(original);
+  });
   it("substitui os dados do site e não mexe no resto nem na última ROM", () => {
     const s = armazenamento({
       "pokedex:favorites": "[1]",
