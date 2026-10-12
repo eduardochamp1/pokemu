@@ -37,3 +37,11 @@
 .timeline-item time { font-size: .7rem; color: var(--text-dim); padding-top: 2px; }
 .timeline-item small { color: var(--text-muted); text-transform: uppercase; font-size: .62rem; letter-spacing: .05em; }
 .timeline-item img { max-width: 160px; border: 1px solid var(--border); border-radius: 4px; image-rendering: pixelated; }
+
+/* Dicas em tres niveis: cada nivel so aparece quando pedido. */
+.hint-levels { list-style: none; display: grid; gap: 12px; margin: 12px 0; }
+.hint-levels li { display: grid; gap: 6px; }
+.hint-levels strong { font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.hint-levels p { font-size: .9rem; line-height: 1.7; }
+.hint-levels button { justify-self: start; padding: 8px 14px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: .85rem; }
+.hint-levels button:hover { border-color: var(--accent); }

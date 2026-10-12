@@ -14,7 +14,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 9. Diário automático ilustrado
 - [x] 10. Laboratório do time
 - [x] 11. Preparação para o próximo líder
-- [ ] 12. Guia com dicas em três níveis
+- [x] 12. Guia com dicas em três níveis
 - [ ] 13. Álbum da jornada
 - [ ] 14. Modo desafio
 - [ ] 15. Ramificações de aventura

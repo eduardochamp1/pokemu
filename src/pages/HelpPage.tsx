@@ -10,6 +10,7 @@ import { useGuideText, writeGuideText } from "../lib/guideStore";
 import { useT } from "../i18n/lang";
 import AdventureJournal from "../components/AdventureJournal";
 import WalkthroughSources from "../components/WalkthroughSources";
+import ProgressiveHints from "../components/ProgressiveHints";
 import "../styles/trainer.css";
 import "../styles/journal.css";
 
@@ -41,6 +42,7 @@ export default function HelpPage() {
     {!rom ? <p className="page-scope"><Link to="/">{t("Abrir biblioteca →", "Open library →")}</Link></p> : <>
       <p className="page-scope">{badges ? t(`Último save lido: ${badges.filter(Boolean).length} de ${badges.length} insígnias.`, `Last recorded save: ${badges.filter(Boolean).length} of ${badges.length} badges.`) : t("Ainda não há progresso válido lido para este jogo.", "No valid progress has been read for this game yet.")} {t("A ajuda usa o último save e seus objetivos; a localização atual não é detectada aqui.", "Help uses your last save and goals; current location is not detected here.")}</p>
       <WalkthroughSources rom={rom} />
+      <ProgressiveHints key={`hints:${rom}`} rom={rom} badges={badges} />
       <GuideReader key={rom} rom={rom} />
       <AdventureJournal key={`journal:${rom}`} rom={rom} />
     </>}
