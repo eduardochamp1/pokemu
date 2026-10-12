@@ -76,3 +76,25 @@
   .library-cartridge { padding: 16px 12px; }
   .library-toolbar label:not(.library-search) { flex: 1; }
 }
+
+/* Retomada: a primeira coisa da biblioteca para quem ja tem jogos. A cor da
+   edicao entra so no filete, para o texto continuar no contraste do tema. */
+.library-resume { border-left-color: var(--edition, var(--accent)); background: var(--surface-1); }
+.library-resume strong { font-family: var(--font-display); font-size: 1.25rem; }
+.library-resume span { color: var(--text-muted); font-size: .8rem; }
+.library-resume-actions { display: flex !important; align-items: center; gap: 18px; flex-shrink: 0; }
+.library-resume-actions a { font-size: .85rem; color: var(--text-muted); }
+.library-resume .library-primary { color: var(--accent-ink); padding: 12px 20px; }
+
+/* Cartucho na cor da edicao: dois jogos do mesmo console deixam de parecer
+   o mesmo. O degrade para o escuro e o que mantem a sigla legivel. */
+.library-cartridge.has-edition {
+  background: linear-gradient(135deg, var(--edition), color-mix(in srgb, var(--edition) 45%, #0b0e13));
+}
+.library-cartridge.has-edition span,
+.library-cartridge.has-edition strong { color: var(--edition-ink, #fff); }
+.library-card p { color: var(--text-muted); }
+
+@media (max-width: 640px) {
+  .library-resume-actions { justify-content: space-between; }
+}

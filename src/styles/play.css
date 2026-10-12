@@ -1258,3 +1258,16 @@
     min-width: 44px;
   }
 }
+
+/* As acoes do estado vazio: o overlay nao recebe clique (e moldura), os
+   botoes dentro dele sim. */
+.play-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 4px;
+  pointer-events: auto;
+}
+.play-overlay-actions .play-primary { width: auto; }

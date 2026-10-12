@@ -18,6 +18,8 @@ const RELEASES = [
   { title: "leaf[ -]?green", date: "2004-01-29" },
   { title: "emerald", date: "2004-09-16" },
 ].map(({ title, date }, order) => ({
+  // "fire[ -]?red" -> "firered"; "green|midori" -> "green".
+  id: title.split("|")[0].replace(/[^a-z]/g, ""),
   date,
   order,
   // Aceita nomes simples e nomes de dumps com região/revisão entre parênteses.

@@ -14,7 +14,7 @@ import { teclaDoTurbo } from "./usePlayPage";
 import type { PlayState } from "./usePlayPage";
 
 export default function PlayStage({ p }: { p: PlayState }) {
-  const { currentRom, display, dragging, emu, en, focarPalco, lang, onDrop, playing, screenRef, setDragging, tx } = p;
+  const { libraryGames, romInputRef, showWorkspace, currentRom, display, dragging, emu, en, focarPalco, lang, onDrop, playing, screenRef, setDragging, tx } = p;
   return (
     <div className="play-stage">
           {/* Carcaca: lente, LEDs e grelha em volta da tela. E moldura —
@@ -60,11 +60,25 @@ export default function PlayStage({ p }: { p: PlayState }) {
                 ) : emu.status.kind === "ready" ? (
                   <>
                     <p className="play-overlay-title">{tx("Nenhum jogo carregado", "No game loaded")}</p>
-                    <p className="play-overlay-hint">
-                      {tx(
-                        "Arraste uma ROM aqui, escolha um arquivo ou pegue da sua biblioteca ao lado.",
-                        "Drag a ROM here, pick a file or take one from your library on the side."
+                    {/* A saída do estado vazio fica aqui dentro: antes a tela
+                        preta só apontava para "ao lado", que no celular é
+                        embaixo e fora da vista. */}
+                    <div className="play-overlay-actions">
+                      {libraryGames.length > 0 && (
+                        <button type="button" className="play-primary" onClick={() => showWorkspace("biblioteca")}>
+                          {tx("Escolher na biblioteca", "Pick from the library")}
+                        </button>
                       )}
+                      <button
+                        type="button"
+                        className={libraryGames.length > 0 ? "play-linkish" : "play-primary"}
+                        onClick={() => romInputRef.current?.click()}
+                      >
+                        {tx("Adicionar um arquivo…", "Add a file…")}
+                      </button>
+                    </div>
+                    <p className="play-overlay-hint">
+                      {tx("Ou arraste uma ROM para cá.", "Or drag a ROM here.")}
                     </p>
                     <p className="play-overlay-hint">
                       {tx(
