@@ -34,3 +34,36 @@ describe("gen3Learnset", () => {
     expect(gen3Learnset(p)).toEqual(["absorb", "tackle"]);
   });
 });
+
+describe("baseStatsOf com past_stats", () => {
+  const st = (name: string, base_stat: number) => ({ base_stat, stat: { name } });
+  const hoje = [st("hp", 35), st("attack", 55), st("defense", 40), st("special-attack", 50), st("special-defense", 50), st("speed", 90)];
+
+  /** Pikachu: Defesa 30 e Defesa Especial 40 até a Gen 5. */
+  it("usa o valor da época, não o de hoje", () => {
+    const pikachu = {
+      stats: hoje,
+      past_stats: [
+        { generation: { name: "generation-i" }, stats: [st("special", 50)] },
+        { generation: { name: "generation-v" }, stats: [st("defense", 30), st("special-defense", 40)] },
+      ],
+    };
+    expect(baseStatsOf(pikachu)).toEqual({ hp: 35, atk: 55, def: 30, spa: 50, spd: 40, spe: 90 });
+  });
+
+  it("mudança anterior à Gen 3 não se aplica", () => {
+    const p = { stats: hoje, past_stats: [{ generation: { name: "generation-ii" }, stats: [st("defense", 1)] }] };
+    expect(baseStatsOf(p)?.def).toBe(40);
+  });
+
+  it("com duas mudanças depois da Gen 3, vale a mais antiga", () => {
+    const p = {
+      stats: hoje,
+      past_stats: [
+        { generation: { name: "generation-vii" }, stats: [st("attack", 60)] },
+        { generation: { name: "generation-v" }, stats: [st("attack", 50)] },
+      ],
+    };
+    expect(baseStatsOf(p)?.atk).toBe(50);
+  });
+});

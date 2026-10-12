@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
-import { legacyBattleTeam } from "../lib/legacyBattle";
-import { loadCatalog, type Catalog } from "../lib/offlineCatalog";
-import { JOHTO_BADGES, resolveJohtoGyms } from "../data/gymLeadersJohto";
+import {
+  chartMultiplier,
+  gymSetOf,
+  legacyBadges,
+  legacyBattleTeam,
+  legacyGyms,
+  loadLegacyCatalog,
+  type GymSet,
+  type LegacyCatalog,
+} from "../lib/legacyCatalog";
 import { Link } from "react-router-dom";
 import { useMoveDetails, usePokemonIndex, usePokemonsByNames } from "../hooks/usePokemon";
 import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import { namesForIds } from "../lib/filters";
 import { moveSlugById } from "../lib/teamSheet";
 import { gen3MoveData, gen3PokemonTypes } from "../lib/gen3Damage";
-import { nextGym, prepareForGym, rankForGym, type BattleMember } from "../lib/gymGuide";
+import { nextGym, prepareForGym, rankForGym, type BattleMember, type TypeChart } from "../lib/gymGuide";
 import { EMERALD_GYMS, FRLG_GYMS, type Gym } from "../data/gymLeaders";
 import { badgesOf } from "../lib/gen3Game";
 import { prettyMoveName } from "../lib/moves";
@@ -22,22 +29,24 @@ import { useLang, tr } from "../i18n/lang";
 import "../styles/trainer.css";
 import "../styles/gyms.css";
 
-type Jogo = "emerald" | "frlg" | "gsc";
+type Jogo = "emerald" | "frlg" | GymSet;
+const ANTIGOS: readonly Jogo[] = ["rb", "yellow", "gsc"];
+const ehAntigo = (j: Jogo): j is GymSet => ANTIGOS.includes(j);
 
-/** O catálogo embarcado, carregado sob demanda: é o que resolve Johto. */
-function useCatalog(ativo: boolean): Catalog | null {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
+/** O catálogo da geração do jogo escolhido, carregado sob demanda. */
+function useLegacyCatalog(generation: 1 | 2 | null): LegacyCatalog | null {
+  const [loaded, setLoaded] = useState<LegacyCatalog | null>(null);
   useEffect(() => {
-    if (!ativo || catalog) return;
+    if (generation === null) return;
     let vivo = true;
-    void loadCatalog().then((c) => {
-      if (vivo) setCatalog(c);
+    void loadLegacyCatalog(generation).then((c) => {
+      if (vivo) setLoaded(c);
     });
     return () => {
       vivo = false;
     };
-  }, [ativo, catalog]);
-  return catalog;
+  }, [generation]);
+  return loaded && loaded.generation === generation ? loaded : null;
 }
 
 /** O seu time do save como `BattleMember`: tipos e golpes de Gen 3. */
@@ -88,31 +97,36 @@ const GymsPage = () => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const entries = useTrainerEntries();
-  // Gen 2: o guia de Johto. Gen 1 fica de fora — a tabela de tipos era outra.
-  const johto = useLegacyAdventures().filter(e => e.save.generation === 2);
+  const antigas = useLegacyAdventures();
   const activeRom = useActiveAdventure();
   const [escolhido, setEscolhido] = useState<Jogo | null>(null);
   // O jogo da aventura ativa manda; sem ela (ou se ela não tem guia), o do
   // save mais recente.
   const daAtiva = entries.find(entry => entry.rom === activeRom && (entry.game ?? "emerald") !== "rs");
-  const ativaEmJohto = johto.some(e => e.rom === activeRom);
+  const ativaAntiga = antigas.find(e => e.rom === activeRom);
+  // Sem aventura ativa com guia e sem save de Gen 3, vale a de Gen 1/2 mais recente.
+  const antigaPadrao = ativaAntiga ?? (!daAtiva && !entries.length ? antigas[0] : undefined);
   const jogo: Jogo = escolhido
-    ?? (ativaEmJohto ? "gsc" : (daAtiva ?? entries[0])?.game === "frlg" ? "frlg" : !daAtiva && !entries.length && johto.length ? "gsc" : "emerald");
-  const catalog = useCatalog(jogo === "gsc");
+    ?? (antigaPadrao ? gymSetOf(antigaPadrao.save) : (daAtiva ?? entries[0])?.game === "frlg" ? "frlg" : "emerald");
+  const antigo = ehAntigo(jogo) ? jogo : null;
+  const catalog = useLegacyCatalog(antigo === null ? null : antigo === "gsc" ? 2 : 1);
 
-  const gen3Compativeis = jogo === "gsc" ? [] : entries.filter(entry => (entry.game ?? "emerald") === jogo);
-  const compatible: { rom: string }[] = jogo === "gsc" ? johto : gen3Compativeis;
+  const gen3Compativeis = antigo ? [] : entries.filter(entry => (entry.game ?? "emerald") === jogo);
+  const antigasCompativeis = antigo ? antigas.filter(e => gymSetOf(e.save) === antigo) : [];
+  const compatible: { rom: string }[] = antigo ? antigasCompativeis : gen3Compativeis;
   const { entry: escolhida, matched } = pickAdventure(compatible, activeRom);
-  const entry = jogo === "gsc" ? undefined : gen3Compativeis.find(e => e.rom === escolhida?.rom);
-  const legacy = jogo === "gsc" ? johto.find(e => e.rom === escolhida?.rom) : undefined;
+  const entry = antigo ? undefined : gen3Compativeis.find(e => e.rom === escolhida?.rom);
+  const legacy = antigo ? antigasCompativeis.find(e => e.rom === escolhida?.rom) : undefined;
 
-  const gyms = jogo === "gsc" ? (catalog ? resolveJohtoGyms(catalog) : []) : jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
-  const insignias = jogo === "gsc" ? JOHTO_BADGES : badgesOf(jogo);
-  // Em Gen 2 o save tem 16 insígnias: as oito primeiras são as de Johto.
-  const doSave = jogo === "gsc" ? (legacy ? legacy.save.trainer.badges.slice(0, 8) : null) : entry ? entry.trainer.badges : null;
+  const gyms = antigo ? (catalog ? legacyGyms(catalog, antigo) : []) : jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
+  const insignias = antigo ? (catalog ? legacyBadges(catalog, antigo) : []) : badgesOf(jogo as "emerald" | "frlg");
+  // O save de Gen 2 tem as 16 insígnias na ordem do guia: Johto e depois Kanto.
+  const doSave = antigo ? (legacy ? legacy.save.trainer.badges : null) : entry ? entry.trainer.badges : null;
   const proximo = nextGym(doSave);
   const timeGen3 = useMeuTime(entry);
-  const meuTime = jogo === "gsc" ? (catalog && legacy ? legacyBattleTeam(catalog, legacy.save) : []) : timeGen3;
+  const meuTime = antigo ? (catalog && legacy ? legacyBattleTeam(catalog, legacy.save) : []) : timeGen3;
+  // Cada geração com a sua tabela de tipos.
+  const chart = useMemo(() => (antigo && catalog ? chartMultiplier(catalog) : undefined), [antigo, catalog]);
 
   return (
     <div className="trainer-shell">
@@ -123,6 +137,8 @@ const GymsPage = () => {
           <select value={jogo} onChange={(e) => setEscolhido(e.target.value as Jogo)}>
             <option value="emerald">Emerald</option>
             <option value="frlg">FireRed/LeafGreen</option>
+            <option value="rb">Red/Blue</option>
+            <option value="yellow">Yellow</option>
             <option value="gsc">Gold/Silver/Crystal</option>
           </select>
         </label>
@@ -134,11 +150,11 @@ const GymsPage = () => {
         </select>
       </label>
       {activeRom && !matched && escolhido === null && <p className="page-scope" role="status">{t(`A aventura ativa (${adventureLabel(activeRom)}) não tem guia de ginásios; mostrando ${escolhida ? adventureLabel(escolhida.rom) : "só os líderes"}.`, `The active adventure (${adventureLabel(activeRom)}) has no gym guide; showing ${escolhida ? adventureLabel(escolhida.rom) : "leaders only"}.`)}</p>}
-      <p className="page-scope">{t("Guia disponível para Emerald, FireRed/LeafGreen e os oito líderes de Johto em Gold/Silver/Crystal. Só comparamos times de saves do jogo selecionado. Gen 1 e Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
+      <p className="page-scope">{t("Guia disponível para Emerald, FireRed/LeafGreen, Red/Blue, Yellow e os dezesseis líderes de Gold/Silver/Crystal. Só comparamos times de saves do jogo selecionado, com a tabela de tipos da geração dele. Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
       <p className="trainer-sub">
-        {jogo === "gsc" ? t(
-          "Times de Johto transcritos de memória da decompilação (pret/pokecrystal) e ainda não conferidos linha a linha. A conta usa a tabela de tipos da Gen 2, que é a mesma da Gen 3.",
-          "Johto teams transcribed from memory of the decompilation (pret/pokecrystal), not yet checked line by line. The math uses the Gen 2 type chart, which matches Gen 3."
+        {antigo ? t(
+          "Times, tipos e golpes gerados das decompilações (pret/pokered, pret/pokeyellow e pret/pokecrystal). Na Gen 1 os golpes de cada pokémon do líder são os que o jogo dá pelo nível, mais a exceção de cada ginásio.",
+          "Teams, types and moves generated from the decompilations (pret/pokered, pret/pokeyellow and pret/pokecrystal). In Gen 1 each leader pokémon's moves are the ones the game gives by level, plus each gym's exception."
         ) : t(
           "Times tirados da decompilação (pret/pokeemerald e pret/pokefirered): a primeira luta de cada líder. Ruby/Sapphire têm times um pouco diferentes.",
           "Teams taken from the decompilation (pret/pokeemerald and pret/pokefirered): each leader's first battle. Ruby/Sapphire have slightly different teams."
@@ -160,7 +176,8 @@ const GymsPage = () => {
             ganho={doSave?.[i] ?? false}
             proximo={doSave !== null && proximo === i}
             meuTime={meuTime}
-            comCalculadora={jogo !== "gsc"}
+            comCalculadora={!antigo}
+            chart={chart}
           />
         ))}
       </ol>
@@ -176,16 +193,18 @@ interface CardProps {
   meuTime: BattleMember[];
   /** A calculadora de dano é de Gen 3: em Johto os atalhos para ela não aparecem. */
   comCalculadora: boolean;
+  /** A tabela de tipos da geração; ausente, vale a da Gen 3. */
+  chart?: TypeChart;
 }
 
-const GymCard = ({ gym, badge, ganho, proximo, meuTime, comCalculadora }: CardProps) => {
+const GymCard = ({ gym, badge, ganho, proximo, meuTime, comCalculadora, chart }: CardProps) => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
-  const ranking = meuTime.length ? rankForGym(meuTime, gym) : [];
+  const ranking = meuTime.length ? rankForGym(meuTime, gym, chart) : [];
   // A ordem das colunas é a do time; o ranking só escolhe quem destacar.
   const destaque = ranking[0]?.member.name;
   // Só para o próximo ginásio: é o único que a pessoa está de fato preparando.
-  const prep = proximo && meuTime.length ? prepareForGym(meuTime, gym) : null;
+  const prep = proximo && meuTime.length ? prepareForGym(meuTime, gym, chart) : null;
 
   return (
     <li className={`gym${proximo ? " gym-proximo" : ""}`}>

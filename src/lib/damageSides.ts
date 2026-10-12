@@ -14,11 +14,34 @@ const STAT: Record<string, keyof StatSpread> = {
   speed: "spe",
 };
 
-export function baseStatsOf(p: { stats: { base_stat: number; stat: { name: string } }[] }): StatSpread | undefined {
+const ROMANOS: Record<string, number> = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9 };
+const geracao = (nome: string) => ROMANOS[nome.replace("generation-", "")] ?? 0;
+
+/**
+ * Os status base **da Gen 3**. A PokéAPI dá os de hoje, e trinta espécies das
+ * primeiras gerações foram reforçadas depois — o Pikachu ganhou Defesa e
+ * Defesa Especial na Gen 6. `past_stats` diz o valor que valia até cada
+ * geração; para a Gen 3 vale a entrada da menor geração que seja 3 ou mais.
+ * Conferido contra a decompilação: os 251 primeiros batem.
+ */
+export function baseStatsOf(p: {
+  stats: { base_stat: number; stat: { name: string } }[];
+  past_stats?: { generation: { name: string }; stats: { base_stat: number; stat: { name: string } }[] }[];
+}): StatSpread | undefined {
   const out: Partial<StatSpread> = {};
   for (const s of p.stats) {
     const k = STAT[s.stat.name];
     if (k) out[k] = s.base_stat;
+  }
+  const antigos = (p.past_stats ?? [])
+    .filter((e) => geracao(e.generation.name) >= 3)
+    .sort((a, b) => geracao(b.generation.name) - geracao(a.generation.name));
+  // Do mais recente para o mais antigo: o mais próximo da Gen 3 escreve por último.
+  for (const e of antigos) {
+    for (const s of e.stats) {
+      const k = STAT[s.stat.name];
+      if (k) out[k] = s.base_stat;
+    }
   }
   return Object.keys(out).length === 6 ? (out as StatSpread) : undefined;
 }

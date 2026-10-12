@@ -97,6 +97,22 @@ function golpeDaGen3(m, ordem) {
 
 const STATS = ["hp", "attack", "defense", "special-attack", "special-defense", "speed"];
 
+/**
+ * Os status base da Gen 3. A PokéAPI dá os de hoje, e trinta espécies das
+ * primeiras gerações foram reforçadas depois (o Pikachu ganhou Defesa na
+ * Gen 6). `past_stats` diz o valor que valia **até** cada geração; para a
+ * Gen 3 vale a entrada da menor geração que seja 3 ou mais, campo a campo.
+ */
+function statusDaGen3(p) {
+  const antigos = (p.past_stats ?? [])
+    .filter((e) => geracao(e.generation.name) >= 3)
+    .sort((a, b) => geracao(a.generation.name) - geracao(b.generation.name));
+  return STATS.map((nome) => {
+    const antes = antigos.find((e) => e.stats.some((s) => s.stat.name === nome));
+    return antes ? antes.stats.find((s) => s.stat.name === nome).base_stat : p.stats.find((x) => x.stat.name === nome).base_stat;
+  });
+}
+
 async function main() {
   console.log("Ordem dos grupos de versão…");
   const grupos = await fetchJson(`${API}/version-group?limit=200`);
@@ -113,7 +129,7 @@ async function main() {
   console.log(`${ESPECIES} espécies…`);
   const especies = await pool(Array.from({ length: ESPECIES }, (_, i) => i + 1), async (id) => {
     const p = await fetchJson(`${API}/pokemon/${id}`);
-    const stats = STATS.map((s) => p.stats.find((x) => x.stat.name === s).base_stat);
+    const stats = statusDaGen3(p);
     const learnset = p.moves
       .filter((m) => m.version_group_details.some((d) => GRUPOS_DA_GEN_3.has(d.version_group.name)))
       .map((m) => idDaUrl(m.move.url))

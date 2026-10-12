@@ -24,17 +24,20 @@ export interface Matchup {
 
 const deDano = (moves: GymMove[]) => moves.filter((m) => m.power !== null && m.power > 0);
 
-function melhor(moves: GymMove[], alvo: TypeName[]): { mult: number | null; move?: string } {
+/** A tabela de tipos em uso. O padrão é a da Gen 3; Gen 1 e Gen 2 passam a delas. */
+export type TypeChart = (moveType: TypeName, defenderTypes: TypeName[]) => number;
+
+function melhor(moves: GymMove[], alvo: TypeName[], chart: TypeChart): { mult: number | null; move?: string } {
   let out: { mult: number | null; move?: string } = { mult: null };
   for (const m of deDano(moves)) {
-    const mult = gen3TypeMultiplier(m.type, alvo);
+    const mult = chart(m.type, alvo);
     if (out.mult === null || mult > out.mult) out = { mult, move: m.slug };
   }
   return out;
 }
 
-export function matchup(member: BattleMember, mon: GymMon): Matchup {
-  return { offense: melhor(member.moves, mon.types), defense: melhor(mon.moves, member.types) };
+export function matchup(member: BattleMember, mon: GymMon, chart: TypeChart = gen3TypeMultiplier): Matchup {
+  return { offense: melhor(member.moves, mon.types, chart), defense: melhor(mon.moves, member.types, chart) };
 }
 
 export interface GymRank {
@@ -47,10 +50,10 @@ export interface GymRank {
  * Quem levar: somatório, pokémon a pokémon do líder, de quanto você bate e de
  * quanto apanha. Só tipos — nível e status ficam para a calculadora de dano.
  */
-export function rankForGym(team: BattleMember[], gym: Gym): GymRank[] {
+export function rankForGym(team: BattleMember[], gym: Gym, chart: TypeChart = gen3TypeMultiplier): GymRank[] {
   return team
     .map((member) => {
-      const matchups = gym.party.map((mon) => matchup(member, mon));
+      const matchups = gym.party.map((mon) => matchup(member, mon, chart));
       let score = 0;
       for (const { offense, defense } of matchups) {
         const o = offense.mult;
@@ -96,14 +99,14 @@ export interface GymPrep {
  * Continua sendo leitura de tipos. Cada cenário é o ponto de partida para a
  * calculadora, que é quem diz se o golpe derruba.
  */
-export function prepareForGym(team: BattleMember[], gym: Gym): GymPrep {
+export function prepareForGym(team: BattleMember[], gym: Gym, chart: TypeChart = gen3TypeMultiplier): GymPrep {
   const scenarios: GymScenario[] = [];
   const uncovered: GymMon[] = [];
   for (const mon of gym.party) {
     let melhorIndice = -1;
     let melhorMult: number | null = null;
     team.forEach((member, i) => {
-      const m = matchup(member, mon).offense.mult;
+      const m = matchup(member, mon, chart).offense.mult;
       if (m === null) return;
       const atual = melhorIndice < 0 ? undefined : team[melhorIndice];
       // Empate no tipo: vale o de nível mais alto.

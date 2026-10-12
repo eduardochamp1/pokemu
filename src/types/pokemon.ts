@@ -109,6 +109,8 @@ export interface Pokemon {
   abilities: PokemonAbility[];
   /** Vem na mesma resposta; usado para saber a habilidade de Gen 3. */
   past_abilities?: PastAbilities[];
+  /** Status base que valiam **até** aquela geração (o que foi reforçado depois). */
+  past_stats?: { generation: { name: string; url: string }; stats: PokemonStat[] }[];
   height: number;
   weight: number;
   species: { name: string; url: string };
