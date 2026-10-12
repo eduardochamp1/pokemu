@@ -6,6 +6,7 @@
  */
 import type { LegacyGame, RomId } from "../romId";
 import { GEN1_SPECIES } from "./gen1Species";
+import { growthRateOf, levelFromExp } from "../../lib/gen3Level";
 
 export interface LegacyMon {
   slot: number;
@@ -34,6 +35,12 @@ export interface LegacySave {
   party: LegacyMon[];
   pokedex: { seen: number[]; owned: number[] };
   boxes: { current: number; boxes: { name: string; pokemon: LegacyMon[] | null }[] };
+}
+
+/** O nível de um pokémon de caixa da Gen 1, que o registro não guarda: sai da experiência. */
+export function gen1BoxLevel(national: number, experience: number): number | null {
+  const rate = growthRateOf(national);
+  return rate ? levelFromExp(rate, experience) : null;
 }
 
 // Game character codes, not Unicode/ASCII. Japanese Green uses six-byte names.
@@ -103,7 +110,13 @@ function readList(b: Uint8Array, base: number, capacity: number, gen: 1 | 2, jap
       if (b[move + i] > (gen === 1 ? 165 : 251)) return null;
       if (b[move + i]) moves.push({ id: b[move + i], pp: b[pp + i] & 63, ppUps: b[pp + i] >> 6 });
     }
-    const level = gen === 1 ? (party ? b[o + 33] : null) : b[o + 31];
+    const experience = u24(b, o + (gen === 1 ? 14 : 8));
+    // Na caixa de Gen 1 o nível sai da experiência, pela curva de crescimento
+    // da espécie — a mesma conta que o jogo refaz ao retirar o pokémon. As
+    // curvas das 151 não mudaram depois, então a tabela de `gen3Level` serve.
+    // Conferido nos dois saves reais de `saves/`: o nível derivado bate com o
+    // gravado no time (Mudkip, 364 exp → 8; Bulbasaur, 135 exp → 5).
+    const level = gen === 1 ? (party ? b[o + 33] : gen1BoxLevel(national, experience)) : b[o + 31];
     if (level !== null && (level < 1 || level > 100)) return null;
     const hp = party ? u16(b, o + (gen === 1 ? 1 : 34)) : 0;
     const maxHp = party ? u16(b, o + (gen === 1 ? 34 : 36)) : 0;
@@ -111,7 +124,7 @@ function readList(b: Uint8Array, base: number, capacity: number, gen: 1 | 2, jap
     result.push({
       slot, national, egg, level, nickname: readGbText(b, nicknames + slot * length, length, japanese),
       originalTrainer: readGbText(b, trainers + slot * length, length, japanese), trainerId: u16(b, o + (gen === 1 ? 12 : 6)),
-      experience: u24(b, o + (gen === 1 ? 14 : 8)), heldItem: gen === 2 ? b[o + 1] : null,
+      experience, heldItem: gen === 2 ? b[o + 1] : null,
       friendship: gen === 2 ? b[o + 27] : null,
       shiny: gen === 2 ? def === 10 && spe === 10 && special === 10 && (atk & 2) !== 0 : null,
       dvs: { hp: ((atk & 1) << 3) | ((def & 1) << 2) | ((spe & 1) << 1) | (special & 1), atk, def, spe, special },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGen1Save, parseGen2Save, parseLegacySave, readGbText } from "./legacy";
+import { gen1BoxLevel, parseGen1Save, parseGen2Save, parseLegacySave, readGbText } from "./legacy";
 import { legacyFixture } from "./legacy.fixture";
 import { GEN1_SPECIES } from "./gen1Species";
 import type { LegacyGame } from "../romId";
@@ -87,5 +87,23 @@ describe("Gen 1 and Gen 2 cartridge readers", () => {
   it("decodes independent Japanese and English game character codes", () => {
     expect(readGbText(Uint8Array.from([0x80, 0x92, 0x87, 0x50, 0x99]), 0, 5)).toBe("ASH");
     expect(readGbText(Uint8Array.from([0x9a, 0xaf, 0x86, 0x50]), 0, 4, true)).toBe("ヒョキ");
+  });
+});
+
+describe("nível na caixa de Gen 1", () => {
+  /** Os mesmos pares que os saves reais de saves/ mostram no time. */
+  it("sai da experiência pela curva da espécie", () => {
+    expect(gen1BoxLevel(1, 135)).toBe(5); // Bulbasaur, medium-slow
+    expect(gen1BoxLevel(25, 1000)).toBe(10); // Pikachu, medium-fast: 10³
+    expect(gen1BoxLevel(25, 999)).toBe(9);
+    expect(gen1BoxLevel(4, 0)).toBe(1);
+  });
+
+  it("não passa de 100 nem com experiência acima do teto", () => {
+    expect(gen1BoxLevel(25, 16_000_000)).toBe(100);
+  });
+
+  it("todas as 151 têm curva: nenhuma fica sem nível", () => {
+    for (let n = 1; n <= 151; n++) expect(gen1BoxLevel(n, 500), `#${n}`).not.toBeNull();
   });
 });

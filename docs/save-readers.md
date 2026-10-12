@@ -31,10 +31,10 @@ pelo leitor desta etapa.
 - Histórico por ROM de novas capturas, insígnias e retorno a saves anteriores.
 
 Não se atribuem naturezas ou habilidades a Gen 1/2. Shiny de Gen 1 fica
-indisponível, pois a geração não apresenta essa característica. O leitor de
-PC de Gen 1 não inventa nível para registros de caixa: a experiência é
-exibida, e o nível permanece indisponível até termos a derivação validada
-para a geração. Gen 1/2 não têm PV; o histórico não presume uma identidade
+indisponível, pois a geração não apresenta essa característica. No PC de
+Gen 1 o registro de caixa não guarda o nível: ele é derivado da experiência
+pela curva de crescimento da espécie, a mesma conta que o jogo refaz ao
+retirar o pokémon. Gen 1/2 não têm PV; o histórico não presume uma identidade
 individual para registrar evoluções.
 
 Os dados são atualizados quando o jogo grava e ao importar/restaurar saves.

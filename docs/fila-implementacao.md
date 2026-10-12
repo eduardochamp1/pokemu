@@ -20,7 +20,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 15. Ramificações de aventura
 - [x] 16. Mapa de progresso
 - [x] 17. Ginásios, dano e comparação para Gen 1/2 — **parcial**, ver notas
-- [ ] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana
+- [x] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana — **parcial**, ver notas
 - [ ] 19. CI no GitHub
 - [ ] 20. Renomear os caches `pokedex-*` do service worker sem perder dados
 - [ ] 21. Assinatura digital do `.exe` (depende de certificado: documentar o que falta)
@@ -86,6 +86,24 @@ Ficou de fora, e por quê:
   (DVs e experiência de status) são outros; a calculadora atual segue a
   decompilação de Emerald e não serve de base.
 
+### 18. Leitores de save (parcial)
+
+Feito:
+- Os dois saves reais de `saves/` foram lidos, sem alteração (o hash dos
+  arquivos é o mesmo antes e depois): Emerald (ZE, Mudkip nv 8, ₽3.300,
+  0h45) e LeafGreen (LG, Bulbasaur nv 5, ₽3.000, 0h05). Os dois passam no
+  leitor de Gen 3, e `gen3Real.test.ts` passa com o save de Emerald.
+- O nível dos pokémon no PC de Gen 1 agora sai da experiência, pela curva da
+  espécie. A conta bate com o nível gravado no time dos dois saves reais.
+
+Ficou de fora, e por quê:
+- **Não há save real de Gen 1 nem de Gen 2** em `saves/`. Os leitores dessas
+  gerações continuam validados só por fixtures sintéticas.
+- **Gen 2 japonesa e coreana.** Os offsets, o tamanho dos nomes e o layout
+  das caixas são outros. Sem um save real (ou os offsets conferidos na
+  referência, mais uma fixture) o leitor sairia sem como saber se está certo.
+
 ## Dúvidas para o usuário
 
-Nenhuma até agora.
+- **Saves de Gen 1 e Gen 2 para validar.** Se você jogar e salvar em Red/Blue/Yellow e em Gold/Silver/Crystal, os arquivos aparecem em `saves/` e dá para conferir os leitores com `npm run save:check`.
+- **Gen 2 japonesa e coreana:** você tem alguma dessas ROMs e quer o leitor? Sem ROM nem save não há como validar.
