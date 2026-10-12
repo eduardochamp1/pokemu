@@ -6,7 +6,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 1. Commitar o trabalho existente em blocos lógicos
 - [x] 2. Identidade da ROM por hash + ID de aventura, com migração por renomeação
 - [x] 3. Scanline só na tela do jogo; erro de gravação visível em `legacyAdventures`; guias fora do `localStorage`
-- [ ] 4. Aventura ativa compartilhada entre Aventuras, Ginásios, Ajuda e Planejar batalhas
+- [x] 4. Aventura ativa compartilhada entre Aventuras, Ginásios, Ajuda e Planejar batalhas
 - [ ] 5. Redesenho da biblioteca e do palco, quebrando a `PlayPage`
 - [ ] 6. Resumo "Onde parei?"
 - [ ] 7. Cápsula de backup completa da aventura

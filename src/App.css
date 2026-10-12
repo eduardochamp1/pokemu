@@ -778,3 +778,22 @@ html[data-scanline="on"] .play-screen::after {
   font-size: 0.55rem;
   letter-spacing: -0.06em;
 }
+
+/* A aventura ativa na navbar: nome longo corta com reticencias em vez de
+   empurrar os links. */
+.nav-adventure {
+  max-width: 180px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-adventure:hover { border-color: var(--accent); color: var(--text); }
+@media (max-width: 860px) {
+  .nav-adventure { display: none; }
+}

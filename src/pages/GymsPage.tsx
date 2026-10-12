@@ -12,6 +12,7 @@ import { prettyMoveName } from "../lib/moves";
 import { pokemonLabel } from "../lib/pokemonLabel";
 import { tType } from "../data/i18n";
 import PokemonMini from "../components/PokemonMini";
+import { adventureLabel, pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
 import { useLang, tr } from "../i18n/lang";
 import "../styles/trainer.css";
 import "../styles/gyms.css";
@@ -66,11 +67,14 @@ const GymsPage = () => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const entries = useTrainerEntries();
-  const [selectedRom, setSelectedRom] = useState("");
+  const activeRom = useActiveAdventure();
   const [escolhido, setEscolhido] = useState<Jogo | null>(null);
-  const jogo: Jogo = escolhido ?? (entries[0]?.game === "frlg" ? "frlg" : "emerald");
+  // O jogo da aventura ativa manda; sem ela (ou se ela não tem guia), o do
+  // save mais recente.
+  const daAtiva = entries.find(entry => entry.rom === activeRom && (entry.game ?? "emerald") !== "rs");
+  const jogo: Jogo = escolhido ?? ((daAtiva ?? entries[0])?.game === "frlg" ? "frlg" : "emerald");
   const compatible = entries.filter(entry => (entry.game ?? "emerald") === jogo);
-  const entry = compatible.find(entry => entry.rom === selectedRom) ?? compatible[0];
+  const { entry, matched } = pickAdventure(compatible, activeRom);
   const gyms = jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
   const insignias = badgesOf(jogo);
   const doSave = entry && (entry.game ?? "emerald") === jogo ? entry.trainer.badges : null;
@@ -90,11 +94,12 @@ const GymsPage = () => {
         </label>
       </header>
       <label className="page-selector">{t("Time da aventura", "Adventure team")}
-        <select value={entry?.rom ?? ""} onChange={event => setSelectedRom(event.target.value)} disabled={!compatible.length}>
+        <select value={entry?.rom ?? ""} onChange={event => setActiveAdventure(event.target.value)} disabled={!compatible.length}>
           {!compatible.length && <option value="">{t("Sem save compatível — consultando os líderes", "No compatible save — viewing leaders")}</option>}
           {compatible.map(entry => <option key={entry.rom} value={entry.rom}>{entry.rom.replace(/\.[^.]+$/, "")}</option>)}
         </select>
       </label>
+      {activeRom && !matched && escolhido === null && <p className="page-scope" role="status">{t(`A aventura ativa (${adventureLabel(activeRom)}) não tem guia de ginásios; mostrando ${entry ? adventureLabel(entry.rom) : "só os líderes"}.`, `The active adventure (${adventureLabel(activeRom)}) has no gym guide; showing ${entry ? adventureLabel(entry.rom) : "leaders only"}.`)}</p>}
       <p className="page-scope">{t("Guia disponível para Emerald e FireRed/LeafGreen. Só comparamos times de saves do jogo selecionado. Gen 1, Gen 2 e Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
       <p className="trainer-sub">
         {t(

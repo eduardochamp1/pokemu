@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
 import { Link } from "react-router-dom";
 import PokedexLink from "../components/PokedexLink";
 import { useTrainerEntries } from "../lib/trainerLog";
@@ -33,13 +34,13 @@ const TrainerPage = () => {
   const entries = useTrainerEntries();
   const legacyEntries = useLegacyAdventures();
   const personal = usePersonalAdventures();
-  const [selectedRom, setSelectedRom] = useState("");
+  const activeRom = useActiveAdventure();
   const adventures = [
     ...entries.map(entry => ({ key: `gen3:${entry.rom}`, rom: entry.rom, updatedAt: entry.updatedAt })),
     ...legacyEntries.map(entry => ({ key: `legacy:${entry.rom}`, rom: entry.rom, updatedAt: entry.updatedAt })),
     ...personal.filter(entry => (entry.notes.length || entry.goals.length || entry.guide) && !entries.some(saved => saved.rom === entry.rom) && !legacyEntries.some(saved => saved.rom === entry.rom)).map(entry => ({ key: `personal:${entry.rom}`, rom: entry.rom, updatedAt: Math.max(0, ...entry.notes.map(note => note.at), ...entry.goals.map(goal => goal.at)) })),
   ].sort((a, b) => b.updatedAt - a.updatedAt);
-  const selected = adventures.find(entry => entry.key === selectedRom) ?? adventures[0];
+  const selected = pickAdventure(adventures, activeRom).entry;
   const entry = selected?.key.startsWith("gen3:") ? entries.find(entry => entry.rom === selected.rom) : undefined;
   const lang = useLang();
   // `t` aqui é o treinador; a tradução se chama `tx`.
@@ -62,7 +63,7 @@ const TrainerPage = () => {
   const slugDe = useCallback((n: number) => slugOf.get(n), [slugOf]);
   const selector = adventures.length > 0 && <label className="page-selector">
     {tx("Aventura acompanhada", "Tracked adventure")}
-    <select value={selected?.key ?? ""} onChange={event => setSelectedRom(event.target.value)}>
+    <select value={selected?.key ?? ""} onChange={event => { const chosen = adventures.find(adventure => adventure.key === event.target.value); if (chosen) setActiveAdventure(chosen.rom); }}>
       {adventures.map(adventure => <option key={adventure.key} value={adventure.key}>{adventure.rom.replace(/\.[^.]+$/, "")}</option>)}
     </select>
   </label>;

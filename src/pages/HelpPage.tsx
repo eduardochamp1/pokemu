@@ -5,6 +5,7 @@ import { compareRomsChronologically } from "../emulator/romChronology";
 import { useTrainerEntries } from "../lib/trainerLog";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
 import { usePersonalAdventures, usePersonalAdventure, updatePersonalAdventure, validPersonalAdventure } from "../lib/personalAdventures";
+import { setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
 import { useGuideText, writeGuideText } from "../lib/guideStore";
 import { useT } from "../i18n/lang";
 import AdventureJournal from "../components/AdventureJournal";
@@ -26,7 +27,8 @@ export default function HelpPage() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
-  const requested = params.get("rom") ?? getLoadedRom() ?? "";
+  const activeRom = useActiveAdventure();
+  const requested = params.get("rom") ?? activeRom ?? getLoadedRom() ?? "";
   const roms = [...new Set([...local, ...trainerEntries.map(entry => entry.rom), ...legacyEntries.map(entry => entry.rom), ...personal.map(entry => entry.rom), ...(requested ? [requested] : [])])].map(fileName => ({ fileName })).sort(compareRomsChronologically);
   const rom = requested || roms[0]?.fileName;
   const saved = trainerEntries.find(entry => entry.rom === rom);
@@ -35,7 +37,7 @@ export default function HelpPage() {
   return <div className="trainer-shell">
     <header className="trainer-header"><h1>{t("Ajuda e detonados", "Help and walkthroughs")}</h1></header>
     <p className="trainer-sub">{t("Busque o obstáculo, consulte dicas sem abrir todos os spoilers e registre o que quer tentar.", "Search for an obstacle, read hints without revealing every spoiler and record your next step.")}</p>
-    <label className="page-selector">{t("Jogo da biblioteca", "Library game")}<select value={rom ?? ""} onChange={event => setParams({ rom: event.target.value })}>{!roms.length && <option value="">{t("Adicione um jogo à biblioteca", "Add a game to the library")}</option>}{roms.map(entry => <option key={entry.fileName} value={entry.fileName}>{entry.fileName}</option>)}</select></label>
+    <label className="page-selector">{t("Jogo da biblioteca", "Library game")}<select value={rom ?? ""} onChange={event => { setActiveAdventure(event.target.value); setParams({ rom: event.target.value }); }}>{!roms.length && <option value="">{t("Adicione um jogo à biblioteca", "Add a game to the library")}</option>}{roms.map(entry => <option key={entry.fileName} value={entry.fileName}>{entry.fileName}</option>)}</select></label>
     {!rom ? <p className="page-scope"><Link to="/">{t("Abrir biblioteca →", "Open library →")}</Link></p> : <>
       <p className="page-scope">{badges ? t(`Último save lido: ${badges.filter(Boolean).length} de ${badges.length} insígnias.`, `Last recorded save: ${badges.filter(Boolean).length} of ${badges.length} badges.`) : t("Ainda não há progresso válido lido para este jogo.", "No valid progress has been read for this game yet.")} {t("A ajuda usa o último save e seus objetivos; a localização atual não é detectada aqui.", "Help uses your last save and goals; current location is not detected here.")}</p>
       <WalkthroughSources rom={rom} />

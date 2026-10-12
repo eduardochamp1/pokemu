@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
 import { Link } from "react-router-dom";
 import { useMoveDetail, usePokemonDetail, usePokemonIndex } from "../hooks/usePokemon";
 import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
@@ -83,9 +84,9 @@ function useLado(sel: Sel, team: Gen3PartyMember[]): Lado {
  */
 const DamagePage = () => {
   const entries = useTrainerEntries();
-  const [rom, setRom] = useState("");
-  const entry = entries.find(entry => entry.rom === rom) ?? entries[0];
-  return <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setRom} />;
+  const activeRom = useActiveAdventure();
+  const { entry } = pickAdventure(entries, activeRom);
+  return <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setActiveAdventure} />;
 };
 
 const DamageCalculator = ({ entry, entries, onSelect }: { entry?: TrainerEntry; entries: TrainerEntry[]; onSelect: (rom: string) => void }) => {
