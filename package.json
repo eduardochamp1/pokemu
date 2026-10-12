@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "bench": "node scripts/bench-emulador.mjs",
     "sprites": "node scripts/fetch-sprites.mjs",
+    "catalog": "node scripts/build-catalog.mjs",
     "gen3:species": "node scripts/gen3-species.mjs",
     "gen3:save-check": "node scripts/gen3-save-check.mjs",
     "desktop": "npm run build && electron .",

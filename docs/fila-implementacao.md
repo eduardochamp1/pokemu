@@ -10,7 +10,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 5. Redesenho da biblioteca e do palco, quebrando a `PlayPage`
 - [x] 6. Resumo "Onde parei?"
 - [x] 7. Cápsula de backup completa da aventura
-- [ ] 8. Dados essenciais offline, sem depender da PokéAPI
+- [x] 8. Dados essenciais offline, sem depender da PokéAPI
 - [ ] 9. Diário automático ilustrado
 - [ ] 10. Laboratório do time
 - [ ] 11. Preparação para o próximo líder
