@@ -15,7 +15,12 @@
     "bench": "node scripts/bench-emulador.mjs",
     "sprites": "node scripts/fetch-sprites.mjs",
     "gen3:species": "node scripts/gen3-species.mjs",
-    "gen3:save-check": "node scripts/gen3-save-check.mjs"
+    "gen3:save-check": "node scripts/gen3-save-check.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:pack": "npm run build && electron-builder --win portable --x64",
+    "desktop:test": "node --test desktop/files.test.mjs",
+    "desktop:smoke": "electron . --smoke-test",
+    "save:check": "node scripts/save-check.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.2",
@@ -32,6 +37,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.12.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
@@ -41,5 +48,33 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
+  },
+  "main": "desktop/main.mjs",
+  "description": "Emulador de Game Boy, Game Boy Color e Game Boy Advance",
+  "author": "Pokemu",
+  "build": {
+    "appId": "com.pokemu.desktop",
+    "productName": "Pokemu",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.mjs",
+      "desktop/files.mjs",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "public/logo512.png",
+      "signAndEditExecutable": true,
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "Pokemu-0.1.0-Windows.exe"
+    },
+    "compression": "store"
   }
 }
