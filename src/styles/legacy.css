@@ -1,0 +1,8 @@
+.legacy-save { margin-block: 1rem; }
+.legacy-party { list-style: none; padding: 0; display: grid; gap: .75rem; }
+.legacy-member { display: flex; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.legacy-member details { flex: 1; min-width: 180px; font-size: .85rem; overflow-wrap: anywhere; }
+.legacy-save summary, .legacy-adventures summary { cursor: pointer; padding-block: .5rem; }
+.legacy-save h3 { margin-block: 1rem .5rem; }
+.legacy-adventures { margin-block: 1.5rem; }
+.legacy-adventures select { max-width: 100%; padding: .5rem; }

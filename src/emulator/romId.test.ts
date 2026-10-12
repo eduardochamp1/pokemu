@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { identifyRom, GBA_HEADER_BYTES } from "./romId";
+import { identifyRom, GBA_HEADER_BYTES, ROM_HEADER_BYTES } from "./romId";
 
 /**
  * Monta um cabeçalho GBA sintético.
@@ -129,5 +129,32 @@ describe("identifyRom — romhack", () => {
       cabecalhoGba({ titulo: "POKEMON FIRE", codigo: "BPRE" })
     );
     expect(hack).toEqual(oficial);
+  });
+});
+
+function gbHeader(title: string, cgb: number, japanese = false) {
+  const b = new Uint8Array(ROM_HEADER_BYTES);
+  b.set(Array.from(title, c => c.charCodeAt(0)), 0x134);
+  b[0x143] = cgb;
+  b[0x14a] = japanese ? 0 : 1;
+  for (let i = 0x134; i <= 0x14c; i++) b[0x14d] = (b[0x14d] - b[i] - 1) & 255;
+  return b;
+}
+describe("GB/GBC headers measured in the local collection", () => {
+  for (const [title, game, generation, cgb] of [
+    ["POKEMON RED", "red", 1, 0], ["POKEMON GREEN", "green", 1, 0],
+    ["POKEMON BLUE", "blue", 1, 0], ["POKEMON YELLOW", "yellow", 1, 128],
+    ["POKEMON_GLDAAUE", "gold", 2, 128], ["POKEMON_SLVAAXE", "silver", 2, 128],
+    ["PM_CRYSTAL\0BYTE", "crystal", 2, 192],
+  ] as const) {
+    it(`recognizes ${game} and selects the cartridge language`, () => {
+      expect(identifyRom(gbHeader(title, cgb, game === "green"))).toMatchObject({ legacyGame: game, geracao: generation, language: game === "green" ? "japanese" : "international" });
+    });
+  }
+  it("rejects damaged and unrelated GB headers", () => {
+    const b = gbHeader("POKEMON RED", 0);
+    b[0x14d] ^= 1;
+    expect(identifyRom(b)).toBeNull();
+    expect(identifyRom(gbHeader("TETRIS", 0))).toBeNull();
   });
 });

@@ -28,13 +28,14 @@
  * dois jogos passariam a compartilhar o mesmo save e o progresso corromperia.
  * A chave tem que sair do nome do arquivo.
  *
- * **GB e GBC ficam de fora.** Não há `.gb` nem `.gbc` no repositório para
- * conferir, e os offsets desses cabeçalhos só existiriam aqui de memória. Um
- * cartucho desses cai no `null` e a tela usa `consoleOf` como antes.
+ * GB/GBC usam título, destino e checksum do cabeçalho, conferidos nas sete
+ * ROMs locais da coleção. O destino distingue o layout japonês de Gen 1.
  */
 
 /** Quantos bytes bastam para identificar um cartucho GBA. */
 export const GBA_HEADER_BYTES = 0xc0;
+export const ROM_HEADER_BYTES = 0x150;
+export type LegacyGame = "red" | "green" | "blue" | "yellow" | "gold" | "silver" | "crystal";
 
 const TITULO_OFFSET = 0xa0;
 const TITULO_TAMANHO = 12;
@@ -50,7 +51,9 @@ export interface RomId {
   titulo: string;
   /** Game code completo: 3 bytes de jogo + 1 de região. Ex.: `BPEE`. */
   codigo: string;
-  console: "Game Boy Advance";
+  console: "Game Boy Advance" | "Game Boy" | "Game Boy Color";
+  legacyGame?: LegacyGame;
+  language?: "international" | "japanese";
   /** Nome do jogo em inglês, como ele é vendido e citado. */
   jogo: string;
   /** Id de `src/data/versionGroups.ts`. */
@@ -142,7 +145,7 @@ function latin1(bytes: Uint8Array): string {
 
 export function identifyRom(bytes: Uint8Array | undefined | null): RomId | null {
   if (!bytes || bytes.length < GBA_HEADER_BYTES) return null;
-  if (bytes[MARCA_FIXA_OFFSET] !== MARCA_FIXA) return null;
+  if (bytes[MARCA_FIXA_OFFSET] !== MARCA_FIXA) return identifyGbRom(bytes);
 
   // Corte de tamanho fixo, e só depois a aparagem: o título de 12 caracteres
   // não tem terminador, e procurar NUL leria direto no game code.
@@ -164,5 +167,34 @@ export function identifyRom(bytes: Uint8Array | undefined | null): RomId | null 
     ...jogo,
     regiaoDoCartucho: REGIOES[codigo.charAt(3)],
     versao: bytes[VERSAO_OFFSET] ?? 0,
+  };
+}
+
+function identifyGbRom(bytes: Uint8Array): RomId | null {
+  if (bytes.length < ROM_HEADER_BYTES) return null;
+  let checksum = 0;
+  for (let i = 0x134; i <= 0x14c; i++) checksum = (checksum - bytes[i] - 1) & 255;
+  if (checksum !== bytes[0x14d]) return null;
+  const cgb = (bytes[0x143] & 0x80) !== 0;
+  const rawTitle = latin1(bytes.subarray(0x134, cgb ? 0x143 : 0x144)).replace(/[\0\s]+$/, "");
+  const games: Record<string, [LegacyGame, string]> = {
+    "POKEMON RED": ["red", "Red"], "POKEMON GREEN": ["green", "Green"],
+    "POKEMON BLUE": ["blue", "Blue"], "POKEMON YELLOW": ["yellow", "Yellow"],
+    "POKEMON_GLD": ["gold", "Gold"], "POKEMON_SLV": ["silver", "Silver"],
+    "PM_CRYSTAL": ["crystal", "Crystal"],
+  };
+  const titulo = Object.keys(games).find(title => rawTitle === title ||
+    (["POKEMON_GLD", "POKEMON_SLV", "PM_CRYSTAL"].includes(title) && rawTitle.startsWith(title)));
+  const game = titulo ? games[titulo] : undefined;
+  if (!game || (bytes[0x14a] !== 0 && bytes[0x14a] !== 1)) return null;
+  const [legacyGame, jogo] = game;
+  const geracao = ["gold", "silver", "crystal"].includes(legacyGame) ? 2 : 1;
+  const language = bytes[0x14a] === 0 ? "japanese" : "international";
+  return {
+    titulo: titulo!, codigo: titulo!, console: geracao === 2 ? "Game Boy Color" : "Game Boy",
+    jogo, legacyGame, language, geracao, regiaoId: geracao === 2 ? "johto" : "kanto",
+    versionGroupId: geracao === 2 ? (legacyGame === "crystal" ? "crystal" : "gold-silver")
+      : legacyGame === "yellow" ? "yellow" : language === "japanese" ? "red-green-japan" : "red-blue",
+    regiaoDoCartucho: language === "japanese" ? "Japão" : "Internacional", versao: bytes[0x14c],
   };
 }
