@@ -16,6 +16,7 @@ import LegacySavePanel from "../components/LegacySavePanel";
 import GameLibrary from "../components/GameLibrary";
 import AdventureJournal from "../components/AdventureJournal";
 import WhereILeftOff from "../components/WhereILeftOff";
+import IllustratedJournal from "../components/IllustratedJournal";
 import { generationLabel } from "../i18n/common";
 import { nomeDaRegiao, romano } from "./play/usePlayPage";
 import { usePlayPage } from "./play/usePlayPage";
@@ -150,6 +151,9 @@ const PlayPage = () => {
           {emu.legacySave ? <LegacySavePanel save={emu.legacySave} /> : <PlayTeam team={emu.team} lido={emu.teamLido} />}
           {currentRom && <WhereILeftOff key={`recap:${currentRom}`} rom={currentRom} />}
           {currentRom && <AdventureJournal key={currentRom} rom={currentRom} />}
+          {currentRom && (
+            <IllustratedJournal rom={currentRom} screenshots={emu.screenshots} readScreenshot={emu.readScreenshot} />
+          )}
           </div>
           <SavesPanel p={p} />
           <SettingsPanel p={p} />
