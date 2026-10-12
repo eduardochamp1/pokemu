@@ -12,7 +12,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 7. Cápsula de backup completa da aventura
 - [x] 8. Dados essenciais offline, sem depender da PokéAPI
 - [x] 9. Diário automático ilustrado
-- [ ] 10. Laboratório do time
+- [x] 10. Laboratório do time
 - [ ] 11. Preparação para o próximo líder
 - [ ] 12. Guia com dicas em três níveis
 - [ ] 13. Álbum da jornada

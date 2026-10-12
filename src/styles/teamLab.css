@@ -1,0 +1,36 @@
+/* Laboratorio do time, em "Planejar batalhas" e na preparacao para o lider. */
+.team-lab {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+}
+.team-lab h2 { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 12px; }
+.team-lab h3 {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 18px 0 8px;
+}
+.team-lab p { font-size: 0.88rem; line-height: 1.6; }
+.team-lab-list { list-style: none; display: grid; gap: 8px; }
+.team-lab-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.team-lab-list span { color: var(--text-muted); }
+/* Texto escuro sobre a cor do tipo: o mesmo par que as cartas usam. */
+.team-lab .lab-type {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--type-fill, var(--border-strong));
+  color: #15171f;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
