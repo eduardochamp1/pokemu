@@ -1,15 +1,9 @@
 /**
- * A dex do jogador, lida do save de Gen 3 e guardada para o resto do site.
+ * A dex do jogador, lida do save de Gen 3 e guardada no `localStorage`.
  *
- * O save só existe dentro do core do emulador, e o core só existe em `/jogar`.
- * A Home precisa saber o que o jogador pegou **sem** carregar o core (~1,8 MB)
- * — então quem lê o save grava aqui, no `localStorage`, e a Home lê daqui.
- *
- * Uma entrada por ROM, e vale a gravada por último: quem alterna entre dois
- * jogos vê a dex do que jogou agora. Escolher entre elas ficou fora, de
- * propósito, até alguém precisar.
+ * Uma entrada por ROM. Quem lê o save no emulador grava aqui, e o backup de
+ * "Seus dados" leva junto.
  */
-import { useSyncExternalStore } from "react";
 
 export interface PlayerDexEntry {
   /** Nome do arquivo da ROM, que é como o site identifica o jogo. */
@@ -20,16 +14,6 @@ export interface PlayerDexEntry {
   owned: number[];
   updatedAt: number;
 }
-
-export type DexMark = "owned" | "seen";
-
-export const DEX_FILTERS = [
-  { id: "capturados", label: "Capturados", labelEn: "Caught" },
-  { id: "vistos", label: "Vistos, não capturados", labelEn: "Seen, not caught" },
-  { id: "faltam", label: "Não vistos", labelEn: "Not seen" },
-] as const;
-
-export type DexFilter = (typeof DEX_FILTERS)[number]["id"];
 
 /** Tamanho da dex nacional que um jogo de Gen 3 consegue marcar. */
 export const TOTAL_DA_DEX_GEN3 = 386;
@@ -77,27 +61,11 @@ function load(): Record<string, PlayerDexEntry> {
   }
 }
 
-function maisRecente(entradas: Record<string, PlayerDexEntry>): PlayerDexEntry | null {
-  let melhor: PlayerDexEntry | null = null;
-  for (const e of Object.values(entradas)) {
-    if (!melhor || e.updatedAt > melhor.updatedAt) melhor = e;
-  }
-  return melhor;
-}
-
 let entradas: Record<string, PlayerDexEntry> = {};
-let latest: PlayerDexEntry | null = null;
-const listeners = new Set<() => void>();
 
-function emit() {
-  listeners.forEach((l) => l());
-}
-
-/** Relê do `localStorage`. Usado ao iniciar e quando outra aba grava. */
+/** Relê do `localStorage`. Usado ao iniciar. */
 export function reloadPlayerDex(): void {
   entradas = load();
-  latest = maisRecente(entradas);
-  emit();
 }
 
 reloadPlayerDex();
@@ -117,63 +85,9 @@ export function recordPlayerDex(
     updatedAt: now,
   };
   entradas = { ...entradas, [rom]: entry };
-  latest = maisRecente(entradas);
   try {
     localStorage.setItem(KEY, JSON.stringify(entradas));
   } catch {
     // sem localStorage: a dex vale só nesta aba
   }
-  emit();
-}
-
-export function latestPlayerDex(): PlayerDexEntry | null {
-  return latest;
-}
-
-function subscribe(l: () => void) {
-  listeners.add(l);
-  // Outra aba (a do emulador, por exemplo) gravou: relê.
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === KEY) reloadPlayerDex();
-  };
-  window.addEventListener("storage", onStorage);
-  return () => {
-    listeners.delete(l);
-    window.removeEventListener("storage", onStorage);
-  };
-}
-
-export function usePlayerDex(): PlayerDexEntry | null {
-  return useSyncExternalStore(subscribe, latestPlayerDex, () => null);
-}
-
-export function dexMarkOf(
-  entry: PlayerDexEntry | null,
-  national: number
-): DexMark | undefined {
-  if (!entry) return undefined;
-  if (entry.owned.includes(national)) return "owned";
-  if (entry.seen.includes(national)) return "seen";
-  return undefined;
-}
-
-/**
- * Os números nacionais de cada filtro.
- *
- * "vistos" exclui os capturados: quem quer ver o que falta pegar não precisa
- * rever o que já tem. "faltam" se limita a 1–386 porque é a dex que um jogo de
- * Gen 3 tem — um Lucario não "falta" em Emerald, ele não existe lá.
- */
-export function nationalsFor(entry: PlayerDexEntry, filtro: DexFilter): number[] {
-  if (filtro === "capturados") return [...entry.owned];
-  const capturados = new Set(entry.owned);
-  if (filtro === "vistos") return entry.seen.filter((n) => !capturados.has(n));
-  const vistos = new Set(entry.seen);
-  const faltam: number[] = [];
-  for (let n = 1; n <= TOTAL_DA_DEX_GEN3; n++) if (!vistos.has(n)) faltam.push(n);
-  return faltam;
-}
-
-export function parseDexFilter(value: string | null | undefined): DexFilter | undefined {
-  return DEX_FILTERS.some((f) => f.id === value) ? (value as DexFilter) : undefined;
 }

@@ -1,13 +1,7 @@
 import type {
-  GenerationResponse,
-  PokedexResponse,
   Pokemon,
   PokemonListResponse,
 } from "./types/pokemon";
-
-export interface TypeResponse {
-  pokemon: { slot: number; pokemon: { name: string; url: string } }[];
-}
 
 const BASE_URL = "https://pokeapi.co/api/v2";
 
@@ -84,10 +78,6 @@ export function displayName(apiName: string): string {
   return NOME_DA_ESPECIE[apiName.toLowerCase().trim()] ?? apiName;
 }
 
-export function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
-}
-
 /**
  * Retorna null apenas para 404 (recurso inexistente). Qualquer outra falha
  * — rede fora, 5xx, JSON invalido — propaga, para que a UI possa distinguir
@@ -114,22 +104,8 @@ export const searchPokemon = async (
   );
 };
 
-export const getPokemons = async (
-  limit = 25,
-  offset = 0,
-  signal?: AbortSignal
-): Promise<PokemonListResponse> => {
-  const data = await fetchJson<PokemonListResponse>(
-    `${BASE_URL}/pokemon?limit=${limit}&offset=${offset}`,
-    signal
-  );
-  if (!data) throw new Error("Pokemon list unavailable");
-  return data;
-};
-
 /**
- * Indice completo de nomes -> id (1 request, ~90 kB). Base para busca parcial,
- * ordenacao de filtros e resolucao de raridade sem N requests.
+ * Indice completo de nomes -> id (1 request, ~90 kB).
  */
 export const getPokemonIndex = async (
   signal?: AbortSignal
@@ -140,36 +116,4 @@ export const getPokemonIndex = async (
   );
   if (!data) throw new Error("Pokemon index unavailable");
   return data;
-};
-
-export const getPokemonData = async (
-  url: string,
-  signal?: AbortSignal
-): Promise<Pokemon | null> => {
-  return fetchJson<Pokemon>(url, signal);
-};
-
-export const getPokemonsByType = async (
-  typeName: string,
-  signal?: AbortSignal
-): Promise<TypeResponse | null> => {
-  return fetchJson<TypeResponse>(
-    `${BASE_URL}/type/${typeName.toLowerCase()}`,
-    signal
-  );
-};
-
-export const getGeneration = async (
-  gen: string | number,
-  signal?: AbortSignal
-): Promise<GenerationResponse | null> => {
-  return fetchJson<GenerationResponse>(`${BASE_URL}/generation/${gen}`, signal);
-};
-
-/** Dex regional (kanto, paldea, hisui...): tudo que aparece na regiao. */
-export const getPokedex = async (
-  dex: string,
-  signal?: AbortSignal
-): Promise<PokedexResponse | null> => {
-  return fetchJson<PokedexResponse>(`${BASE_URL}/pokedex/${dex}`, signal);
 };

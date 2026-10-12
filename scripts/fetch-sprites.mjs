@@ -1,14 +1,12 @@
 #!/usr/bin/env node
 /**
- * Baixa para `public/sprites/` os assets que o site usa para ilustrar a lore,
- * para o projeto nao depender de CDN de terceiros em runtime.
+ * Baixa para `public/sprites/` os sprites que o site usa no time, no PC e no
+ * cartao do treinador, para o projeto nao depender de CDN de terceiros em runtime.
  *
  *   node scripts/fetch-sprites.mjs          # baixa o que falta
  *   node scripts/fetch-sprites.mjs --force  # rebaixa tudo
  *
- * O que vem:
- *   - sprites pixelados de todos os pokemon (~1.351 arquivos, ~1,6 MB)
- *   - sprites dos itens citados em src/data/items.ts (~40 arquivos, ~11 kB)
+ * O que vem: sprites pixelados de todos os pokemon (~1.351 arquivos, ~1,6 MB).
  *
  * O que NAO vem: o artwork oficial de 475px (~133 kB cada, ~176 MB no total).
  * Esse continua saindo da resposta da PokeAPI nas telas que ja buscam o
@@ -16,7 +14,7 @@
  *
  * Fonte: github.com/PokeAPI/sprites — o mesmo CDN que a PokeAPI referencia.
  */
-import { mkdir, writeFile, access, readFile } from "node:fs/promises";
+import { mkdir, writeFile, access } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,7 +23,6 @@ const SPRITE_CDN =
   "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites";
 const POKEAPI = "https://pokeapi.co/api/v2";
 const OUT_POKEMON = join(ROOT, "public", "sprites", "pokemon");
-const OUT_ITEMS = join(ROOT, "public", "sprites", "items");
 
 const FORCE = process.argv.includes("--force");
 const CONCURRENCY = 16;
@@ -76,17 +73,8 @@ function report(label, tally) {
   console.log(`  ${label}: ${parts.join(", ")}`);
 }
 
-/** Extrai os apiSlug de src/data/items.ts sem precisar compilar TypeScript. */
-async function itemSlugs() {
-  const source = await readFile(join(ROOT, "src", "data", "items.ts"), "utf8");
-  const slugs = new Set();
-  for (const m of source.matchAll(/apiSlug:\s*"([a-z0-9-]+)"/g)) slugs.add(m[1]);
-  return [...slugs].sort();
-}
-
 async function main() {
   await mkdir(OUT_POKEMON, { recursive: true });
-  await mkdir(OUT_ITEMS, { recursive: true });
 
   console.log("Índice de pokémon…");
   const index = await fetchJson(`${POKEAPI}/pokemon?limit=100000`);
@@ -100,15 +88,6 @@ async function main() {
     "pokémon",
     await pool(ids, (id) =>
       download(`${SPRITE_CDN}/pokemon/${id}.png`, join(OUT_POKEMON, `${id}.png`))
-    )
-  );
-
-  const slugs = await itemSlugs();
-  console.log(`Sprites de item (${slugs.length} slugs em items.ts)…`);
-  report(
-    "itens",
-    await pool(slugs, (slug) =>
-      download(`${SPRITE_CDN}/items/${slug}.png`, join(OUT_ITEMS, `${slug}.png`))
     )
   );
 

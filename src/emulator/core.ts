@@ -98,8 +98,8 @@ export function getCore(): Promise<mGBAEmulator> {
   if (!corePromise) {
     corePromise = (async () => {
       // A mesma sequência do `use-emulator.tsx` do gbajs3, `import()`
-      // dinâmico incluído: o core são ~2 MB entre glue e wasm, e quem abre a
-      // Pokédex para ver um Pokémon não tem por que baixá-los. Com o import
+      // dinâmico incluído: o core são ~2 MB entre glue e wasm, e quem abre só
+      // o Treinador ou os Ginásios não tem por que baixá-los. Com o import
       // estático ele ia para o chunk principal e pesava em toda a navegação.
       const { default: mGBA } = await import("@thenick775/mgba-wasm");
       const core = (await mGBA({ canvas: getCanvas() })) as mGBAEmulator;
@@ -118,21 +118,6 @@ export function getCore(): Promise<mGBAEmulator> {
     });
   }
   return corePromise;
-}
-
-/**
- * Liga ou desliga o teclado do jogo, **se** já existe um core com jogo.
- *
- * Para sobreposições como a busca (Ctrl+K): o core recebe as teclas pelo SDL
- * do Emscripten, que não sabe de campo de texto nenhum — digitar "mudkip" na
- * busca andaria com o personagem, e o Enter apertaria Start. Nunca cria o
- * core: abrir a busca na Home não pode baixar 2 MB de emulador.
- */
-export function setGameKeyboard(enabled: boolean): void {
-  if (!corePromise || !loadedRom) return;
-  corePromise.then((core) => core.toggleInput(enabled)).catch(() => {
-    // sem core não há teclado a ligar
-  });
 }
 
 /**

@@ -10,7 +10,7 @@ import { serviceWorkerPrecache } from "./vite-plugin-sw.ts";
  *
  * Em producao o host precisa mandar os mesmos headers — ver public/_headers
  * (Netlify / Cloudflare Pages) e a seção de deploy no README. Sem eles o site
- * continua funcionando: so a rota /jogar detecta a falta e explica o que fazer.
+ * continua funcionando: so o emulador detecta a falta e explica o que fazer.
  *
  * Consequencia: todo recurso cross-origin da pagina precisa ser CORS/CORP.
  * Os sprites ja sao locais; o artwork da PokeAPI e a folha do Google Fonts
@@ -32,8 +32,7 @@ export default defineConfig({
    * reescreve o modulo e move o arquivo, e as duas resolucoes quebram.
    *
    * Com o `exclude`, o `import("@thenick775/mgba-wasm")` entrega o arquivo do
-   * pacote como ele e, e o worker e o wasm sobem. Era este ajuste que faltava
-   * para dispensar a copia manual em `public/emulator/`.
+   * pacote como ele e, e o worker e o wasm sobem.
    */
   optimizeDeps: {
     exclude: ["@thenick775/mgba-wasm"],

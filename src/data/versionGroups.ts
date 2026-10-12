@@ -49,18 +49,3 @@ export const VERSION_GROUPS: { id: string; label: string }[] = [
   { id: "mega-dimension", label: "Mega Dimension" },
   { id: "champions", label: "Champions" },
 ];
-
-/** Posicao na ordem cronologica; -1 para um grupo que ainda nao conhecemos. */
-const ORDER = new Map(VERSION_GROUPS.map((g, index) => [g.id, index]));
-
-export function versionGroupOrder(id: string): number {
-  return ORDER.get(id) ?? -1;
-}
-
-/**
- * Rotulo do jogo. Um grupo desconhecido — a PokeAPI ganha jogos novos — cai
- * para o proprio id em vez de sumir da lista.
- */
-export function versionGroupLabel(id: string): string {
-  return VERSION_GROUPS.find((g) => g.id === id)?.label ?? id;
-}

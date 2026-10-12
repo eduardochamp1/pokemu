@@ -22,19 +22,6 @@ export function buildNameIndex(
 }
 
 /**
- * Interseccao de N listas de nomes, preservando a ordem da primeira lista.
- * Listas vazias participam da interseccao (resultado vazio) — quem nao quer
- * participar nao deve ser passado.
- */
-export function intersectNames(sources: string[][]): string[] {
-  if (sources.length === 0) return [];
-  const [first, ...rest] = sources;
-  if (rest.length === 0) return [...new Set(first)];
-  const sets = rest.map((s) => new Set(s));
-  return [...new Set(first)].filter((name) => sets.every((s) => s.has(name)));
-}
-
-/**
  * Ids da Pokedex -> nomes do indice, na ordem dos ids. Serve para quem so tem
  * numeros nacionais, como a dex lida do save. Id desconhecido fica de fora.
  */
@@ -45,69 +32,4 @@ export function namesForIds(ids: number[], index: Map<string, number>): string[]
     const name = nomePorId.get(id);
     return name === undefined ? [] : [name];
   });
-}
-
-/** Ordena nomes pelo id da Pokedex; desconhecidos vao para o fim, por nome. */
-export function sortNamesById(
-  names: string[],
-  index: Map<string, number>
-): string[] {
-  return [...names].sort((a, b) => {
-    const ia = index.get(a);
-    const ib = index.get(b);
-    if (ia === undefined && ib === undefined) return a.localeCompare(b);
-    if (ia === undefined) return 1;
-    if (ib === undefined) return -1;
-    return ia - ib;
-  });
-}
-
-/**
- * Busca parcial sobre o indice. Relevancia: match exato, depois prefixo,
- * depois substring — cada grupo ordenado por id. Aceita tambem busca por id
- * exato ("25" -> pikachu).
- */
-export function searchNames(
-  query: string,
-  index: Map<string, number>,
-  limit = 60
-): string[] {
-  const q = query.toLowerCase().trim();
-  if (!q) return [];
-
-  if (/^\d+$/.test(q)) {
-    const wanted = Number(q);
-    const hit = [...index.entries()].find(([, id]) => id === wanted);
-    return hit ? [hit[0]] : [];
-  }
-
-  const exact: string[] = [];
-  const prefix: string[] = [];
-  const substring: string[] = [];
-  for (const name of index.keys()) {
-    if (name === q) exact.push(name);
-    else if (name.startsWith(q)) prefix.push(name);
-    else if (name.includes(q)) substring.push(name);
-  }
-  return [
-    ...sortNamesById(exact, index),
-    ...sortNamesById(prefix, index),
-    ...sortNamesById(substring, index),
-  ].slice(0, limit);
-}
-
-/** Fatia uma selecao de nomes na pagina pedida. */
-export function pageOf<T>(items: T[], page: number, perPage: number): T[] {
-  const start = page * perPage;
-  return items.slice(start, start + perPage);
-}
-
-/** Total de paginas para uma selecao (minimo 1, para nao renderizar "1 de 0"). */
-export function totalPagesOf(count: number, perPage: number): number {
-  return Math.max(1, Math.ceil(count / perPage));
-}
-
-/** Ordena nomes alfabeticamente (para o modo de ordenacao "nome"). */
-export function sortNamesAlphabetically(names: string[]): string[] {
-  return [...names].sort((a, b) => a.localeCompare(b));
 }

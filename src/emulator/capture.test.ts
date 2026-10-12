@@ -5,7 +5,6 @@ import {
   screenshotFileName,
   stateThumbnailName,
   parseScreenshotName,
-  isStateThumbnail,
   toDataUrl,
 } from "./capture";
 
@@ -118,8 +117,6 @@ describe("parseScreenshotName", () => {
    */
   it("recusa miniatura de save state", () => {
     expect(parseScreenshotName("Pokemon - Emerald.ss1.png")).toBeNull();
-    expect(isStateThumbnail("Pokemon - Emerald.ss1.png")).toBe(true);
-    expect(isStateThumbnail("Pokemon - Emerald-20260920-101500.png")).toBe(false);
   });
 
   it("recusa qualquer outro arquivo", () => {

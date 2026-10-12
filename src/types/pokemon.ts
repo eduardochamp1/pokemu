@@ -60,66 +60,6 @@ export interface PokemonSprites {
   };
 }
 
-export interface PokemonVariety {
-  is_default: boolean;
-  pokemon: { name: string; url: string };
-}
-
-export interface FlavorTextEntry {
-  flavor_text: string;
-  language: { name: string; url: string };
-  version: { name: string; url: string };
-}
-
-export interface Genus {
-  genus: string;
-  language: { name: string; url: string };
-}
-
-export interface PokemonSpecies {
-  name: string;
-  /** O nome em cada idioma — o quiz esconde todos no texto da Pokédex. */
-  names?: { name: string; language: { name: string } }[];
-  evolution_chain: { url: string };
-  varieties: PokemonVariety[];
-  generation: { name: string; url: string };
-  flavor_text_entries: FlavorTextEntry[];
-  genera: Genus[];
-  is_legendary: boolean;
-  is_mythical: boolean;
-  is_baby: boolean;
-  habitat: { name: string; url: string } | null;
-  color: { name: string; url: string };
-  capture_rate: number;
-  base_happiness: number | null;
-  hatch_counter: number | null;
-  /** -1 = sem gênero; 0..8 = oitavos de chance de ser fêmea. */
-  gender_rate: number;
-  growth_rate: { name: string; url: string } | null;
-  egg_groups: { name: string; url: string }[];
-}
-
-export interface AbilityDetail {
-  name: string;
-  names: { name: string; language: { name: string } }[];
-  effect_entries: {
-    effect: string;
-    short_effect: string;
-    language: { name: string };
-  }[];
-  flavor_text_entries: {
-    flavor_text: string;
-    language: { name: string };
-  }[];
-  /** Vêm na mesma resposta; a página da habilidade usa. */
-  generation?: { name: string; url: string };
-  pokemon?: {
-    is_hidden: boolean;
-    slot: number;
-    pokemon: { name: string; url: string };
-  }[];
-}
-
 export interface EvolutionDetail {
   trigger: { name: string; url: string };
   min_level: number | null;
@@ -142,32 +82,6 @@ export interface EvolutionNode {
   species: { name: string; url: string };
   evolves_to: EvolutionNode[];
   evolution_details: EvolutionDetail[];
-}
-
-export interface EvolutionChain {
-  id: number;
-  chain: EvolutionNode;
-}
-
-export interface GenerationResponse {
-  id: number;
-  name: string;
-  main_region: { name: string; url: string };
-  pokemon_species: { name: string; url: string }[];
-}
-
-/**
- * Dex regional. Nao confundir com GenerationResponse: a geracao lista o que
- * ESTREOU nela, a dex lista o que APARECE na regiao — por isso Paldea tem 400
- * entradas contra as 120 especies novas da geracao IX.
- */
-export interface PokedexResponse {
-  id: number;
-  name: string;
-  pokemon_entries: {
-    entry_number: number;
-    pokemon_species: { name: string; url: string };
-  }[];
 }
 
 /** Como e em que jogo o pokemon aprende um golpe. */

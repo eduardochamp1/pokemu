@@ -125,8 +125,3 @@ export function parseScreenshotName(
   );
   return Number.isNaN(when.getTime()) ? null : { base, when };
 }
-
-/** É miniatura de save state, e não captura de quem joga? */
-export function isStateThumbnail(fileName: string): boolean {
-  return /\.ss\d+\.png$/.test(fileName);
-}

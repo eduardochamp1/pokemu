@@ -7,9 +7,6 @@
 .card { --holo-intensity: 0.22; }
 .card.is-legendary { --holo-intensity: 0.9; }
 .card.is-mythical { --holo-intensity: 1; }
-.card-hero { --holo-intensity: 0.4; }
-.card-hero.is-legendary { --holo-intensity: 0.95; }
-.card-hero.is-mythical { --holo-intensity: 1; }
 
 .card-spectral,
 .card-glitter {
@@ -22,12 +19,10 @@
   z-index: 2;
 }
 
-.card:hover .card-spectral,
-.card-hero:hover .card-spectral {
+.card:hover .card-spectral {
   opacity: calc(var(--holo-intensity) * 0.55);
 }
-.card:hover .card-glitter,
-.card-hero:hover .card-glitter {
+.card:hover .card-glitter {
   opacity: calc(var(--holo-intensity) * 0.7);
 }
 
@@ -55,8 +50,7 @@
   }
 }
 
-.card:not(.is-legendary):not(.is-mythical) .card-glitter,
-.card-hero:not(.is-legendary):not(.is-mythical) .card-glitter {
+.card:not(.is-legendary):not(.is-mythical) .card-glitter {
   display: none;
 }
 
