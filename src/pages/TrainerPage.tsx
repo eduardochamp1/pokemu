@@ -19,6 +19,7 @@ import TrainerCardShare from "../components/TrainerCardShare";
 import LegacyAdventures from "../components/LegacyAdventures";
 import AdventureJournal from "../components/AdventureJournal";
 import WhereILeftOff from "../components/WhereILeftOff";
+import JourneyAlbum from "../components/JourneyAlbum";
 import IllustratedJournal from "../components/IllustratedJournal";
 import { usePersonalAdventures } from "../lib/personalAdventures";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
@@ -230,6 +231,7 @@ const TrainerPage = () => {
       </div>
 
       <Achievements entry={entry} />
+      <JourneyAlbum entry={entry} nameOf={nameOf} />
 
       <section>
         <h2>{tx("Time", "Team")}</h2>
