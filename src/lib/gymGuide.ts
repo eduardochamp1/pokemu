@@ -69,3 +69,58 @@ export function nextGym(badges: boolean[] | null): number | null {
   const i = badges.findIndex((b) => !b);
   return i < 0 ? null : i;
 }
+
+export interface GymScenario {
+  /** Posição do membro no time, que é como a calculadora o seleciona. */
+  attackerIndex: number;
+  attacker: string;
+  defender: GymMon;
+  /** O multiplicador do melhor golpe dele contra este pokémon. */
+  mult: number | null;
+}
+
+export interface GymPrep {
+  /** Para cada pokémon do líder, quem do time bate melhor nele. */
+  scenarios: GymScenario[];
+  /** Os pokémon do líder que ninguém do time atinge com vantagem. */
+  uncovered: GymMon[];
+  /** O maior nível do líder e o maior do time. */
+  aceLevel: number;
+  topLevel: number;
+}
+
+/**
+ * O que olhar antes do próximo líder: quem bate melhor em cada pokémon dele,
+ * onde o time não tem resposta e a diferença de nível.
+ *
+ * Continua sendo leitura de tipos. Cada cenário é o ponto de partida para a
+ * calculadora, que é quem diz se o golpe derruba.
+ */
+export function prepareForGym(team: BattleMember[], gym: Gym): GymPrep {
+  const scenarios: GymScenario[] = [];
+  const uncovered: GymMon[] = [];
+  for (const mon of gym.party) {
+    let melhorIndice = -1;
+    let melhorMult: number | null = null;
+    team.forEach((member, i) => {
+      const m = matchup(member, mon).offense.mult;
+      if (m === null) return;
+      const atual = melhorIndice < 0 ? undefined : team[melhorIndice];
+      // Empate no tipo: vale o de nível mais alto.
+      if (melhorMult === null || m > melhorMult || (m === melhorMult && atual && member.level > atual.level)) {
+        melhorMult = m;
+        melhorIndice = i;
+      }
+    });
+    if (melhorIndice >= 0) {
+      scenarios.push({ attackerIndex: melhorIndice, attacker: team[melhorIndice].name, defender: mon, mult: melhorMult });
+    }
+    if (melhorMult === null || melhorMult <= 1) uncovered.push(mon);
+  }
+  return {
+    scenarios,
+    uncovered,
+    aceLevel: Math.max(0, ...gym.party.map((m) => m.level)),
+    topLevel: Math.max(0, ...team.map((m) => m.level)),
+  };
+}

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import TeamLab from "../components/TeamLab";
 import { pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { parseScenario } from "../lib/damageScenario";
 import { useMoveDetail, usePokemonDetail, usePokemonIndex } from "../hooks/usePokemon";
 import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import type { Gen3PartyMember } from "../emulator/saveParse/gen3";
@@ -102,13 +103,21 @@ const DamageCalculator = ({ entry, entries, onSelect }: { entry?: TrainerEntry; 
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const team = entry?.team ?? [];
 
+  // Cenário vindo de Ginásios: /dano?atk=<posição no time>&def=<espécie>&nivel=<n>.
+  // Vale só como ponto de partida; depois a pessoa mexe à vontade.
+  const [params] = useSearchParams();
+  const cenario = parseScenario(params, team.length);
   const [atk, setAtk] = useState<Sel>(() =>
-    team.length ? { kind: "team", index: 0 } : { kind: "free", slug: "treecko", level: 50 }
+    cenario.atk !== undefined
+      ? { kind: "team", index: cenario.atk }
+      : team.length
+        ? { kind: "team", index: 0 }
+        : { kind: "free", slug: "treecko", level: 50 }
   );
   const [def, setDef] = useState<Sel>(() => ({
     kind: "free",
-    slug: "zigzagoon",
-    level: team[0]?.level ?? 50,
+    slug: cenario.def?.slug ?? "zigzagoon",
+    level: cenario.def?.level ?? team[0]?.level ?? 50,
   }));
   const [golpe, setGolpe] = useState<string | undefined>(undefined);
   const [crit, setCrit] = useState(false);

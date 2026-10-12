@@ -5,7 +5,7 @@ import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import { namesForIds } from "../lib/filters";
 import { moveSlugById } from "../lib/teamSheet";
 import { gen3MoveData, gen3PokemonTypes } from "../lib/gen3Damage";
-import { nextGym, rankForGym, type BattleMember } from "../lib/gymGuide";
+import { nextGym, prepareForGym, rankForGym, type BattleMember } from "../lib/gymGuide";
 import { EMERALD_GYMS, FRLG_GYMS, type Gym } from "../data/gymLeaders";
 import { badgesOf } from "../lib/gen3Game";
 import { prettyMoveName } from "../lib/moves";
@@ -13,6 +13,7 @@ import { pokemonLabel } from "../lib/pokemonLabel";
 import { tType } from "../data/i18n";
 import PokemonMini from "../components/PokemonMini";
 import { adventureLabel, pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
+import { scenarioUrl } from "../lib/damageScenario";
 import { useLang, tr } from "../i18n/lang";
 import "../styles/trainer.css";
 import "../styles/gyms.css";
@@ -144,6 +145,8 @@ const GymCard = ({ gym, badge, ganho, proximo, meuTime }: CardProps) => {
   const ranking = meuTime.length ? rankForGym(meuTime, gym) : [];
   // A ordem das colunas é a do time; o ranking só escolhe quem destacar.
   const destaque = ranking[0]?.member.name;
+  // Só para o próximo ginásio: é o único que a pessoa está de fato preparando.
+  const prep = proximo && meuTime.length ? prepareForGym(meuTime, gym) : null;
 
   return (
     <li className={`gym${proximo ? " gym-proximo" : ""}`}>
@@ -171,6 +174,40 @@ const GymCard = ({ gym, badge, ganho, proximo, meuTime }: CardProps) => {
                 </>
               )}
             </p>
+          )}
+          {prep && (
+            <div className="gym-prep">
+              <h3>{t("Preparação", "Preparation")}</h3>
+              <ul>
+                <li>
+                  {prep.topLevel >= prep.aceLevel
+                    ? t(
+                        `Seu pokémon mais forte está no nível ${prep.topLevel}; o mais forte do líder, no ${prep.aceLevel}.`,
+                        `Your strongest is level ${prep.topLevel}; the leader's strongest is ${prep.aceLevel}.`
+                      )
+                    : t(
+                        `O mais forte do líder está no nível ${prep.aceLevel}, ${prep.aceLevel - prep.topLevel} acima do seu melhor (${prep.topLevel}).`,
+                        `The leader's strongest is level ${prep.aceLevel}, ${prep.aceLevel - prep.topLevel} above your best (${prep.topLevel}).`
+                      )}
+                </li>
+                {prep.uncovered.length > 0 && (
+                  <li>
+                    {t("Sem golpe super efetivo contra: ", "No super effective move against: ")}
+                    {prep.uncovered.map((m) => pokemonLabel(m.species)).join(", ")}.
+                  </li>
+                )}
+              </ul>
+              <p className="trainer-sub">{t("Abrir na calculadora de dano:", "Open in the damage calculator:")}</p>
+              <ul className="gym-prep-links">
+                {prep.scenarios.map((s, k) => (
+                  <li key={k}>
+                    <Link to={scenarioUrl(s.attackerIndex, s.defender.species, s.defender.level)}>
+                      {s.attacker} × {pokemonLabel(s.defender.species)} {t("nv", "lv")} {s.defender.level}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <div className="gym-tabela-rolagem">
             <table className="gym-tabela">

@@ -41,3 +41,10 @@
 .gym-golpe { display: inline !important; color: var(--text-muted); }
 .gym-bom { color: var(--t-grass); font-weight: 700; }
 .gym-ruim { color: var(--t-fire); font-weight: 700; }
+
+/* Preparacao para o proximo lider: o que olhar e atalhos para a calculadora. */
+.gym-prep { margin: 12px 0 16px; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 8px 8px 0; }
+.gym-prep h3 { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+.gym-prep ul { margin-left: 18px; display: grid; gap: 4px; font-size: 0.85rem; line-height: 1.5; }
+.gym-prep-links { list-style: none; margin-left: 0 !important; display: flex !important; flex-wrap: wrap; gap: 8px 14px !important; }
+.gym-prep-links a { color: var(--accent); font-size: 0.82rem; }
