@@ -176,7 +176,7 @@ const GymsPage = () => {
             ganho={doSave?.[i] ?? false}
             proximo={doSave !== null && proximo === i}
             meuTime={meuTime}
-            comCalculadora={!antigo}
+            comCalculadora
             chart={chart}
           />
         ))}

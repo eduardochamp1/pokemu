@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import TeamLab from "../components/TeamLab";
+import LegacyDamage from "../components/LegacyDamage";
 import { pickAdventure, setActiveAdventure, useActiveAdventure } from "../lib/activeAdventure";
 import { Link, useSearchParams } from "react-router-dom";
 import { parseScenario } from "../lib/damageScenario";
@@ -93,6 +94,7 @@ const DamagePage = () => {
       <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setActiveAdventure} />
       <div className="trainer-shell">
         <TeamLab entry={entry} />
+        <LegacyDamage />
       </div>
     </>
   );

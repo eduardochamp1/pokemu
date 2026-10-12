@@ -34,3 +34,11 @@
   font-size: 0.72rem;
   font-weight: 700;
 }
+
+/* Calculadora de Gen 1/2: campos em grade, resultado em destaque. */
+.legacy-damage-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: end; }
+.legacy-damage-form label { display: grid; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
+.legacy-damage-form select,
+.legacy-damage-form input[type="number"] { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 9px 10px; font-size: 0.85rem; min-height: 40px; }
+.legacy-damage-form .legacy-damage-check { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text); min-height: 40px; }
+.legacy-damage-result { margin-top: 16px; font-family: var(--font-display); font-size: 1.15rem !important; }
