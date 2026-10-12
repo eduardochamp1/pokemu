@@ -1,7 +1,8 @@
 /**
  * Leitores somente de leitura de saves GB/GBC. Layouts: PKHeX SAV1Offsets,
  * SAV2Offsets, PK1/PK2 e rotinas de save das decompilações pret.
- * Gen 1 japonês/internacional; Gen 2 Gold/Silver e Crystal internacionais.
+ * Gen 1 japonês/internacional; Gen 2 Gold/Silver/Crystal internacionais e
+ * japonesas, e Gold/Silver coreanas (sem decodificar os nomes).
  * Nunca adapta DVs/stat experience para IVs/EVs/naturezas de Gen 3.
  */
 import type { LegacyGame, RomId } from "../romId";
@@ -28,7 +29,7 @@ export interface LegacyMon {
 export interface LegacySave {
   generation: 1 | 2;
   game: LegacyGame;
-  language: "japanese" | "international";
+  language: "japanese" | "international" | "korean";
   source: "main" | "backup";
   playerName: string;
   trainer: { trainerId: number; gender: "male" | "female" | null; money: number; playTime: { hours: number; minutes: number; seconds: number }; badges: boolean[] };
@@ -161,40 +162,99 @@ export function parseGen1Save(bytes: Uint8Array, game: "red" | "green" | "blue" 
     trainer: { trainerId: u16(bytes, o.tid), gender: "male", money: cash, playTime: { hours: bytes[o.time], minutes, seconds }, badges: Array.from({ length: 8 }, (_, i) => (bytes[o.badges] & (1 << i)) !== 0) } };
 }
 
-export function parseGen2Save(bytes: Uint8Array, game: "gold" | "silver" | "crystal"): LegacySave | null {
+/**
+ * As três famílias de save da Gen 2. Os offsets vêm de `SAV2Offsets` do
+ * PKHeX; o que muda entre elas, além dos endereços:
+ *  - **japonesa**: nomes de 6 bytes, 9 caixas de 30, e a cópia de segurança é
+ *    um bloco só em 0x7209;
+ *  - **coreana** (só Gold/Silver): nomes em dois bytes por sílaba, caixas como
+ *    as internacionais, e o segundo checksum é outra soma — então não há
+ *    recuperação pela cópia.
+ */
+export type Gen2Variant = "international" | "japanese" | "korean";
+
+interface Gen2Layout {
+  time: number; money: number; badges: number; current: number; names: number; party: number;
+  caught: number; seen: number;
+  /** Fim (exclusivo) da região somada no checksum. */
+  end: number; check: number;
+  /** Onde está o checksum da cópia e os trechos [origem, destino, tamanho] que a refazem. */
+  backup?: { check: number; segments: [number, number, number][] };
+  gender?: number;
+}
+
+function gen2Layout(game: "gold" | "silver" | "crystal", variant: Gen2Variant): Gen2Layout | null {
+  const crystal = game === "crystal";
+  if (variant === "korean") {
+    // Não existe Crystal coreana.
+    return crystal ? null : { time: 0x204d, money: 0x23d3, badges: 0x23dc, current: 0x26fc, names: 0x26ff, party: 0x28cc, caught: 0x2a8e, seen: 0x2aae, end: 0x2dab, check: 0x2dab };
+  }
+  if (variant === "japanese") {
+    return crystal
+      ? { time: 0x2034, money: 0x23be, badges: 0x23c7, current: 0x26e2, names: 0x26e5, party: 0x281a, caught: 0x29aa, seen: 0x29ca, end: 0x2ae3, check: 0x2d0d, backup: { check: 0x7f0d, segments: [[0x7209, 0x2009, 0xada]] }, gender: 0x8000 }
+      : { time: 0x2034, money: 0x23bc, badges: 0x23c5, current: 0x2705, names: 0x2708, party: 0x283e, caught: 0x29ce, seen: 0x29ee, end: 0x2c8c, check: 0x2d0d, backup: { check: 0x7f0d, segments: [[0x7209, 0x2009, 0xc83]] } };
+  }
+  return crystal
+    ? { time: 0x2052, money: 0x23dc, badges: 0x23e5, current: 0x2700, names: 0x2703, party: 0x2865, caught: 0x2a27, seen: 0x2a47, end: 0x2b83, check: 0x2d0d, backup: { check: 0x1f0d, segments: [[0x1209, 0x2009, 0xb7a]] }, gender: 0x3e3d }
+    : { time: 0x2053, money: 0x23db, badges: 0x23e4, current: 0x2724, names: 0x2727, party: 0x288a, caught: 0x2a4c, seen: 0x2a6c, end: 0x2d69, check: 0x2d69, backup: { check: 0x7e6d, segments: [[0x15c7, 0x2009, 0x226], [0x3d69, 0x222f, 0x1aa], [0x0c6b, 0x23d9, 0x47d], [0x7e39, 0x2856, 0x34], [0x10e8, 0x288a, 0x4df]] } };
+}
+
+/** O que a tela mostra no lugar de um nome coreano, que este leitor não decodifica. */
+export const KOREAN_NAME = "(nome em coreano)";
+
+export function parseGen2Save(bytes: Uint8Array, game: "gold" | "silver" | "crystal", variant: Gen2Variant = "international"): LegacySave | null {
   if (bytes.length < 0x8000) return null;
   const crystal = game === "crystal";
-  const o = crystal
-    ? { time: 0x2052, money: 0x23dc, badges: 0x23e5, current: 0x2700, names: 0x2703, party: 0x2865, caught: 0x2a27, seen: 0x2a47, end: 0x2b83, check: 0x2d0d, backup: 0x1f0d }
-    : { time: 0x2053, money: 0x23db, badges: 0x23e4, current: 0x2724, names: 0x2727, party: 0x288a, caught: 0x2a4c, seen: 0x2a6c, end: 0x2d69, check: 0x2d69, backup: 0x7e6d };
+  const o = gen2Layout(game, variant);
+  if (!o) return null;
+  const japanese = variant === "japanese";
+  const korean = variant === "korean";
   let b = bytes, source: LegacySave["source"] = "main";
   const valid = (data: Uint8Array, check: number) => sum(data, 0x2009, o.end) === (bytes[check] | (bytes[check + 1] << 8));
   if (!valid(bytes, o.check)) {
+    if (!o.backup) return null;
     b = bytes.slice();
-    const segments = crystal ? [[0x1209, 0x2009, 0xb7a]] : [[0x15c7, 0x2009, 0x226], [0x3d69, 0x222f, 0x1aa], [0x0c6b, 0x23d9, 0x47d], [0x7e39, 0x2856, 0x34], [0x10e8, 0x288a, 0x4df]];
-    for (const [from, to, length] of segments) b.set(bytes.subarray(from, from + length), to);
-    if (!valid(b, o.backup)) return null;
+    for (const [from, to, length] of o.backup.segments) b.set(bytes.subarray(from, from + length), to);
+    if (!valid(b, o.backup.check)) return null;
     source = "backup";
   }
-  const playerName = readGbText(b, 0x200b, 11);
-  const cash = money(b, o.money, 2), party = readList(b, o.party, 6, 2, false, true);
+  // Coreano: duas posições por sílaba numa tabela própria, que não está aqui.
+  // O save é lido inteiro; só os nomes ficam sem tradução.
+  const playerName = korean ? KOREAN_NAME : readGbText(b, 0x200b, japanese ? 6 : 11, japanese);
+  const semNomes = (list: LegacyMon[] | null) =>
+    korean && list ? list.map(m => ({ ...m, nickname: "", originalTrainer: "" })) : list;
+  const cash = money(b, o.money, 2), party = semNomes(readList(b, o.party, 6, 2, japanese, true));
+  const boxCount = japanese ? 9 : 14, capacity = japanese ? 30 : 20, half = japanese ? 6 : 7;
+  // Tamanho de uma caixa: contagem, espécies e terminador, os registros de 32
+  // bytes e os dois nomes de cada um — mais os dois bytes de checksum que a separam da seguinte.
+  const boxSpan = capacity * (1 + 32 + 2 * (japanese ? 6 : 11)) + 2 + 2;
   const minutes = b[o.time + 2], seconds = b[o.time + 3], current = b[o.current];
-  if (!playerName || cash === null || !party || minutes > 59 || seconds > 59 || current >= 14) return null;
+  if (!playerName || cash === null || !party || minutes > 59 || seconds > 59 || current >= boxCount) return null;
   const owned = bits(b, o.caught, 251), seen = bits(b, o.seen, 251);
   if (owned.some(n => !seen.includes(n))) return null;
-  const boxes = Array.from({ length: 14 }, (_, i) => ({ name: readGbText(b, o.names + i * 9, 9) || `BOX ${i + 1}`,
-    pokemon: readList(b, (i < 7 ? 0x4000 : 0x6000) + (i % 7) * 0x450, 20, 2, false, false) }));
-  return { generation: 2, game, source, language: "international", playerName, party, pokedex: { owned, seen }, boxes: { current, boxes },
-    trainer: { trainerId: u16(b, 0x2009), gender: !crystal ? "male" : source === "backup" ? null : b[0x3e3d] === 0 ? "male" : b[0x3e3d] === 1 ? "female" : null,
+  const nameLength = korean ? 17 : 9;
+  const boxes = Array.from({ length: boxCount }, (_, i) => ({
+    name: (korean ? "" : readGbText(b, o.names + i * nameLength, nameLength, japanese)) || `BOX ${i + 1}`,
+    pokemon: semNomes(readList(b, (i < half ? 0x4000 : 0x6000) + (i < half ? i : i - half) * boxSpan, capacity, 2, japanese, false)) }));
+  const genderByte = o.gender !== undefined && source !== "backup" ? b[o.gender] : undefined;
+  return { generation: 2, game, source, language: variant, playerName, party, pokedex: { owned, seen }, boxes: { current, boxes },
+    trainer: { trainerId: u16(b, 0x2009), gender: !crystal ? "male" : genderByte === 0 ? "male" : genderByte === 1 ? "female" : null,
       money: cash, playTime: { hours: u16(b, o.time), minutes, seconds }, badges: Array.from({ length: 16 }, (_, i) => (b[o.badges + (i >> 3)] & (1 << (i & 7))) !== 0) } };
 }
 
-/** Layout is selected from the cartridge, never guessed from save length. */
+/**
+ * Layout is selected from the cartridge, never guessed from save length.
+ *
+ * A exceção é a Gold/Silver coreana: o cabeçalho dela não se distingue do da
+ * internacional pelo campo de destino, então, quando o layout internacional
+ * não fecha o checksum, o coreano é tentado — e só vale se o dele fechar.
+ */
 export function parseLegacySave(bytes: Uint8Array, rom: RomId | null): LegacySave | null {
   if (!rom?.legacyGame) return null;
   const game = rom.legacyGame;
   if (game === "gold" || game === "silver" || game === "crystal") {
-    return rom.language === "international" ? parseGen2Save(bytes, game) : null;
+    if (rom.language === "japanese") return parseGen2Save(bytes, game, "japanese");
+    return parseGen2Save(bytes, game, "international") ?? parseGen2Save(bytes, game, "korean");
   }
   return parseGen1Save(bytes, game, rom.language === "japanese");
 }

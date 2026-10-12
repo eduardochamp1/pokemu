@@ -13,13 +13,20 @@ e do executável; o aplicativo consulta a biblioteca do perfil do Windows.
 | Green japonês | Gen 1 japonês, offsets e nomes de seis bytes |
 | Gold, Silver internacionais | Gen 2, bloco principal e recuperação da cópia de segurança |
 | Crystal internacional | Gen 2, layout próprio e recuperação da cópia de segurança |
+| Gold, Silver, Crystal japonesas | Gen 2 japonês: nomes de seis bytes, nove caixas de trinta e cópia de segurança em bloco único |
+| Gold, Silver coreanas | Gen 2 coreano: números, time, Pokédex e caixas; os nomes não são decodificados |
 | Ruby, Sapphire, Emerald, FireRed, LeafGreen | Leitor de Gen 3 existente |
 
 A identificação GB/GBC lê o título, destino, revisão e checksum do cabeçalho.
 Foi conferida nas sete ROMs GB/GBC da coleção. O título identifica a base, não
 prova que o arquivo é oficial: romhacks que mudem o formato do save precisam
-de um leitor específico. Edições japonesas de Gen 2 e coreanas não são aceitas
-pelo leitor desta etapa.
+de um leitor específico. As edições japonesas de Gen 2 e a Gold/Silver coreana
+têm layout próprio, com os offsets de `SAV2Offsets` do PKHeX. A coreana se
+apresenta no cabeçalho como internacional, então é reconhecida pelo checksum:
+quando o layout internacional não fecha, o coreano é tentado. Os nomes em
+coreano usam dois bytes por sílaba numa tabela que este leitor não tem, e
+aparecem como "(nome em coreano)". Esses dois leitores foram testados só com
+fixtures montadas a partir dos mesmos offsets — falta um save real de cada.
 
 ## Dados disponíveis
 

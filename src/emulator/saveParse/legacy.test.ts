@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { gen1BoxLevel, parseGen1Save, parseGen2Save, parseLegacySave, readGbText } from "./legacy";
-import { legacyFixture } from "./legacy.fixture";
+import { KOREAN_NAME, gen1BoxLevel, parseGen1Save, parseGen2Save, parseLegacySave, readGbText } from "./legacy";
+import { gen2VariantFixture, legacyFixture } from "./legacy.fixture";
+import type { RomId } from "../romId";
 import { GEN1_SPECIES } from "./gen1Species";
 import type { LegacyGame } from "../romId";
 
@@ -105,5 +106,73 @@ describe("nível na caixa de Gen 1", () => {
 
   it("todas as 151 têm curva: nenhuma fica sem nível", () => {
     for (let n = 1; n <= 151; n++) expect(gen1BoxLevel(n, 500), `#${n}`).not.toBeNull();
+  });
+});
+
+describe("Gen 2 japonesa e coreana", () => {
+  for (const game of ["gold", "crystal"] as const) {
+    it(`japonesa (${game}): treinador, time, dex e as nove caixas de trinta`, () => {
+      const f = gen2VariantFixture(game, "japanese");
+      const save = parseGen2Save(f.bytes, game, "japanese")!;
+      expect(save).not.toBeNull();
+      expect(save.language).toBe("japanese");
+      expect(save.playerName).toBe("ヒョキ");
+      expect(save.trainer.trainerId).toBe(12345);
+      expect(save.trainer.money).toBe(123456);
+      expect(save.trainer.playTime).toEqual({ hours: 300, minutes: 34, seconds: 56 });
+      expect(save.trainer.badges.filter(Boolean)).toHaveLength(3);
+      expect(save.party[0]).toMatchObject({ national: 152, level: 5, experience: 135, nickname: "ヒョキ" });
+      expect(save.pokedex).toEqual({ seen: [152], owned: [152] });
+      expect(save.boxes.boxes).toHaveLength(9);
+      expect(save.boxes.current).toBe(2);
+      // A última caixa fica no segundo banco: se o tamanho da caixa estiver
+      // errado, ela é lida do lugar errado e vem vazia ou inválida.
+      expect(save.boxes.boxes[8].pokemon).toHaveLength(1);
+      expect(save.boxes.boxes[8].pokemon![0]).toMatchObject({ national: 152, level: 5 });
+      expect(save.boxes.boxes.slice(0, 8).every((box) => box.pokemon?.length === 0)).toBe(true);
+    });
+
+    it(`japonesa (${game}): recupera da cópia quando o bloco principal não fecha`, () => {
+      const f = gen2VariantFixture(game, "japanese");
+      f.backup();
+      f.bytes[f.offsets.party + 20] ^= 1;
+      const save = parseGen2Save(f.bytes, game, "japanese")!;
+      expect(save).not.toBeNull();
+      expect(save.source).toBe("backup");
+      expect(save.party[0].national).toBe(152);
+    });
+
+    it(`japonesa (${game}): o layout internacional não lê este save`, () => {
+      const f = gen2VariantFixture(game, "japanese");
+      expect(parseGen2Save(f.bytes, game, "international")).toBeNull();
+    });
+  }
+
+  it("coreana: lê os números, o time e as caixas, e deixa os nomes sem tradução", () => {
+    const f = gen2VariantFixture("gold", "korean");
+    const save = parseGen2Save(f.bytes, "gold", "korean")!;
+    expect(save).not.toBeNull();
+    expect(save.language).toBe("korean");
+    expect(save.playerName).toBe(KOREAN_NAME);
+    expect(save.trainer.money).toBe(123456);
+    expect(save.party[0]).toMatchObject({ national: 152, level: 5, nickname: "", originalTrainer: "" });
+    expect(save.boxes.boxes).toHaveLength(14);
+    expect(save.boxes.boxes[13].pokemon).toHaveLength(1);
+  });
+
+  it("coreana: save corrompido é recusado, e não há Crystal coreana", () => {
+    const f = gen2VariantFixture("gold", "korean");
+    f.bytes[f.offsets.party + 20] ^= 1;
+    expect(parseGen2Save(f.bytes, "gold", "korean")).toBeNull();
+    expect(parseGen2Save(gen2VariantFixture("gold", "korean").bytes, "crystal", "korean")).toBeNull();
+  });
+
+  /** O cabeçalho da Gold coreana se apresenta como internacional. */
+  it("pelo cartucho: internacional tenta o layout coreano quando o seu não fecha", () => {
+    const rom = { legacyGame: "gold", language: "international" } as unknown as RomId;
+    expect(parseLegacySave(gen2VariantFixture("gold", "korean").bytes, rom)?.language).toBe("korean");
+    expect(parseLegacySave(legacyFixture("gold").bytes, rom)?.language).toBe("international");
+    const jp = { legacyGame: "crystal", language: "japanese" } as unknown as RomId;
+    expect(parseLegacySave(gen2VariantFixture("crystal", "japanese").bytes, jp)?.language).toBe("japanese");
   });
 });

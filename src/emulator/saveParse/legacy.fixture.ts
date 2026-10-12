@@ -54,3 +54,57 @@ export function legacyFixture(kind: "red" | "green" | "gold" | "crystal") {
   checksum();
   return { bytes: b, offsets: o, checksum, backup };
 }
+
+/**
+ * Saves sintéticos de Gen 2 japonesa e coreana, montados com os offsets de
+ * `SAV2Offsets` do PKHeX. Conferem que o leitor e o layout documentado
+ * concordam; não substituem um save de verdade dessas edições.
+ */
+export function gen2VariantFixture(game: "gold" | "crystal", variant: "japanese" | "korean") {
+  const b = new Uint8Array(0x8000);
+  const jp = variant === "japanese";
+  const o = !jp
+    ? { time: 0x204d, money: 0x23d3, badges: 0x23dc, current: 0x26fc, party: 0x28cc, caught: 0x2a8e, seen: 0x2aae, end: 0x2dab, check: 0x2dab }
+    : game === "crystal"
+      ? { time: 0x2034, money: 0x23be, badges: 0x23c7, current: 0x26e2, party: 0x281a, caught: 0x29aa, seen: 0x29ca, end: 0x2ae3, check: 0x2d0d }
+      : { time: 0x2034, money: 0x23bc, badges: 0x23c5, current: 0x2705, party: 0x283e, caught: 0x29ce, seen: 0x29ee, end: 0x2c8c, check: 0x2d0d };
+  const be = (at: number, n: number) => { b[at] = n >> 8; b[at + 1] = n & 255; };
+  const nameLength = jp ? 6 : 11;
+  // "ヒョキ" em japonês; em coreano, dois bytes quaisquer por sílaba.
+  const name = (at: number) => b.set(jp ? [0x9a, 0xaf, 0x86, 0x50] : [0x0b, 0x01, 0x0b, 0x02, 0x50], at);
+  be(0x2009, 12345); name(0x200b);
+  b.set([1, 0xe2, 0x40], o.money); // 123456
+  b.set([1, 44, 34, 56], o.time); // 300h
+  b[o.badges] = 5; b[o.badges + 1] = 128;
+  b[o.current] = 2;
+  b[o.party] = 1; b[o.party + 1] = 152; b[o.party + 2] = 255;
+  const p = o.party + 8;
+  b[p] = 152; b[p + 1] = 8; b[p + 2] = 33; be(p + 6, 12345); b.set([0, 0, 135], p + 8);
+  be(p + 11, 65535); b.set([0x2a, 0xaa, 0xc5], p + 21); b[p + 27] = 70; b[p + 31] = 5;
+  [19, 20, 10, 11, 12, 13, 14].forEach((v, i) => be(p + 34 + i * 2, v));
+  name(p + 6 * 48);
+  name(p + 6 * 48 + 6 * nameLength);
+  b[o.caught + (151 >> 3)] |= 1 << (151 & 7);
+  b[o.seen + (151 >> 3)] |= 1 << (151 & 7);
+  const boxCount = jp ? 9 : 14, capacity = jp ? 30 : 20, half = jp ? 6 : 7;
+  const span = capacity * (1 + 32 + 2 * nameLength) + 4;
+  const boxAt = (i: number) => (i < half ? 0x4000 : 0x6000) + (i < half ? i : i - half) * span;
+  for (let i = 0; i < boxCount; i++) b[boxAt(i) + 1] = 255;
+  // Um Chikorita na última caixa, para o teste alcançar o segundo banco.
+  const last = boxAt(boxCount - 1);
+  b[last] = 1; b[last + 1] = 152; b[last + 2] = 255;
+  const r = last + capacity + 2;
+  b[r] = 152; b[r + 2] = 33; b.set([0, 0, 135], r + 8); b[r + 31] = 5;
+  const checksum = () => {
+    let total = 0;
+    for (let i = 0x2009; i < o.end; i++) total += b[i];
+    b[o.check] = total & 255; b[o.check + 1] = (total >> 8) & 255;
+  };
+  const backup = () => {
+    const length = o.end - 0x2009;
+    b.set(b.slice(0x2009, 0x2009 + length), 0x7209);
+    b.set(b.slice(o.check, o.check + 2), 0x7f0d);
+  };
+  checksum();
+  return { bytes: b, offsets: o, checksum, backup, boxCount, capacity };
+}
