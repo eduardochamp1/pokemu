@@ -21,3 +21,10 @@
 .walkthrough-sources { list-style: none; display: grid; gap: 12px; }
 .walkthrough-sources li { display: grid; gap: 6px; border-top: 1px solid var(--border); padding-top: 12px; overflow-wrap: anywhere; }
 .walkthrough-sources li > p { font-size: .85rem; }
+
+/* "Onde parei?": rotulo pequeno em cima, o fato embaixo. */
+.recap-list { display: grid; gap: 12px; }
+.recap-list dt { font-size: .7rem; color: var(--text-dim); letter-spacing: .04em; text-transform: uppercase; }
+.recap-list dd { margin-top: 3px; font-size: .9rem; line-height: 1.6; overflow-wrap: anywhere; }
+.recap-list small { color: var(--text-muted); }
+.where-left-off { border-left: 3px solid var(--accent); }

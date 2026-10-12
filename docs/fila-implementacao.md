@@ -8,7 +8,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 3. Scanline só na tela do jogo; erro de gravação visível em `legacyAdventures`; guias fora do `localStorage`
 - [x] 4. Aventura ativa compartilhada entre Aventuras, Ginásios, Ajuda e Planejar batalhas
 - [x] 5. Redesenho da biblioteca e do palco, quebrando a `PlayPage`
-- [ ] 6. Resumo "Onde parei?"
+- [x] 6. Resumo "Onde parei?"
 - [ ] 7. Cápsula de backup completa da aventura
 - [ ] 8. Dados essenciais offline, sem depender da PokéAPI
 - [ ] 9. Diário automático ilustrado

@@ -15,6 +15,7 @@ import PlayTeam from "../components/PlayTeam";
 import LegacySavePanel from "../components/LegacySavePanel";
 import GameLibrary from "../components/GameLibrary";
 import AdventureJournal from "../components/AdventureJournal";
+import WhereILeftOff from "../components/WhereILeftOff";
 import { generationLabel } from "../i18n/common";
 import { nomeDaRegiao, romano } from "./play/usePlayPage";
 import { usePlayPage } from "./play/usePlayPage";
@@ -147,6 +148,7 @@ const PlayPage = () => {
           {/* O save vira fonte de dados do site: os ids nacionais saem
               dele e entram no mesmo hook que a grade usa. */}
           {emu.legacySave ? <LegacySavePanel save={emu.legacySave} /> : <PlayTeam team={emu.team} lido={emu.teamLido} />}
+          {currentRom && <WhereILeftOff key={`recap:${currentRom}`} rom={currentRom} />}
           {currentRom && <AdventureJournal key={currentRom} rom={currentRom} />}
           </div>
           <SavesPanel p={p} />

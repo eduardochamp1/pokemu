@@ -7,6 +7,7 @@ import { reloadLegacyAdventures } from "../lib/legacyAdventures";
 import { reloadPersonalAdventures } from "../lib/personalAdventures";
 import { reloadPlayerDex } from "../lib/playerDex";
 import { reloadTrainerLog } from "../lib/trainerLog";
+import { reloadSessions } from "../lib/sessions";
 
 /**
  * Liga o índice de identidade (`lib/romIdentity`) ao core.
@@ -75,6 +76,7 @@ export async function registerLoadedRom(
     reloadLegacyAdventures();
     reloadTrainerLog();
     reloadPlayerDex();
+    reloadSessions();
     return renamedFrom;
   } catch {
     return undefined;

@@ -18,6 +18,7 @@ import Achievements from "../components/Achievements";
 import TrainerCardShare from "../components/TrainerCardShare";
 import LegacyAdventures from "../components/LegacyAdventures";
 import AdventureJournal from "../components/AdventureJournal";
+import WhereILeftOff from "../components/WhereILeftOff";
 import { usePersonalAdventures } from "../lib/personalAdventures";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
 import { pokemonLabel } from "../lib/pokemonLabel";
@@ -76,6 +77,7 @@ const TrainerPage = () => {
           <span className="trainer-rom"><Link to="/treinador/comparar">{tx("Comparar saves da Gen 3", "Compare Gen 3 saves")}</Link></span>
         </header>
         {selector}
+        {selected && <WhereILeftOff key={`recap:${selected.rom}`} rom={selected.rom} />}
         <LegacyAdventures selectedRom={selected?.rom} />
         {selected && <AdventureJournal key={selected.rom} rom={selected.rom} />}
         {legacyEntries.length === 0 &&
@@ -107,6 +109,7 @@ const TrainerPage = () => {
       </header>
 
       {selector}
+      <WhereILeftOff key={`recap:${entry.rom}`} rom={entry.rom} />
       <AdventureJournal key={entry.rom} rom={entry.rom} />
       <p className="trainer-sub">{tx("Dados da última gravação lida deste jogo. Troque a aventura acima para consultar outro progresso.", "Data from this game's last recorded save. Select another adventure above to view other progress.")}</p>
 

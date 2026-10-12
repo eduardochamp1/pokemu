@@ -1,5 +1,6 @@
 import type { mGBAEmulator } from "./types";
 import { setActiveAdventure } from "../lib/activeAdventure";
+import { markSession } from "../lib/sessions";
 
 /**
  * Carregamento e inicializacao do core mGBA.
@@ -138,7 +139,10 @@ export function getLoadedRom(): string | null {
 export function setLoadedRom(name: string | null): void {
   loadedRom = name;
   // Quem acabou de abrir um jogo quer ver a ficha dele nas outras páginas.
-  if (name) setActiveAdventure(name);
+  if (name) {
+    setActiveAdventure(name);
+    markSession(name);
+  }
 }
 
 /**

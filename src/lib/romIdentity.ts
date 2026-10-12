@@ -135,6 +135,7 @@ const POR_NOME: { key: string; shape: "array" | "record" }[] = [
   { key: "pokedex:legacy-adventures", shape: "array" },
   { key: "pokedex:trainer-log", shape: "record" },
   { key: "pokedex:player-dex", shape: "record" },
+  { key: "pokedex:sessions", shape: "record" },
 ];
 
 /**
