@@ -9,7 +9,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 4. Aventura ativa compartilhada entre Aventuras, Ginásios, Ajuda e Planejar batalhas
 - [x] 5. Redesenho da biblioteca e do palco, quebrando a `PlayPage`
 - [x] 6. Resumo "Onde parei?"
-- [ ] 7. Cápsula de backup completa da aventura
+- [x] 7. Cápsula de backup completa da aventura
 - [ ] 8. Dados essenciais offline, sem depender da PokéAPI
 - [ ] 9. Diário automático ilustrado
 - [ ] 10. Laboratório do time

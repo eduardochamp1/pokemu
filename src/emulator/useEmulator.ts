@@ -1581,6 +1581,8 @@ export function useEmulator() {
     storage,
     localSaves,
     refreshLocalRoms,
+    /** Para quem grava no FS do core por fora daqui (cápsula de aventura). */
+    refreshLibrary,
     backupToDisk,
     restoreFromDisk: restoreFromDiskERelerTime,
   };

@@ -4,6 +4,7 @@ import { formatBytes } from "../../emulator/storage";
 import ScreenshotThumb from "../../components/ScreenshotThumb";
 import SlotName from "../../components/SlotName";
 import { localeOf } from "../../i18n/lang";
+import AdventureCapsule from "../../components/AdventureCapsule";
 import type { PlayState } from "./usePlayPage";
 
 export default function SavesPanel({ p }: { p: PlayState }) {
@@ -210,6 +211,12 @@ export default function SavesPanel({ p }: { p: PlayState }) {
               )}
             </p>
           </section>
+
+          <AdventureCapsule
+            roms={emu.roms.map((r) => r.fileName)}
+            currentRom={currentRom}
+            onRestored={() => emu.refreshLibrary()}
+          />
 
           <section className="play-panel">
             <h2>{tx("Onde ficam seus saves", "Where your saves live")}</h2>
