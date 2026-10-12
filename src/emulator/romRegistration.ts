@@ -10,6 +10,7 @@ import { reloadPlayerDex } from "../lib/playerDex";
 import { reloadTrainerLog } from "../lib/trainerLog";
 import { reloadSessions } from "../lib/sessions";
 import { reloadChallenges } from "../lib/challenge";
+import { reloadMapMarks } from "../lib/mapMarks";
 
 /**
  * Liga o índice de identidade (`lib/romIdentity`) ao core.
@@ -81,6 +82,7 @@ export async function registerLoadedRom(
     reloadPlayerDex();
     reloadSessions();
     reloadChallenges();
+    reloadMapMarks();
     return renamedFrom;
   } catch {
     return undefined;

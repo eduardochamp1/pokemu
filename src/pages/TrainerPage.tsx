@@ -21,6 +21,7 @@ import AdventureJournal from "../components/AdventureJournal";
 import WhereILeftOff from "../components/WhereILeftOff";
 import JourneyAlbum from "../components/JourneyAlbum";
 import ChallengePanel from "../components/ChallengePanel";
+import ProgressMap from "../components/ProgressMap";
 import IllustratedJournal from "../components/IllustratedJournal";
 import { usePersonalAdventures } from "../lib/personalAdventures";
 import { useLegacyAdventures } from "../lib/legacyAdventures";
@@ -85,6 +86,7 @@ const TrainerPage = () => {
         {selected && <AdventureJournal key={selected.rom} rom={selected.rom} />}
         {selected && <IllustratedJournal rom={selected.rom} />}
         {selected && <ChallengePanel key={`desafio:${selected.rom}`} rom={selected.rom} />}
+        {selected && <ProgressMap key={`mapa:${selected.rom}`} rom={selected.rom} />}
         {legacyEntries.length === 0 &&
         <p className="trainer-vazio">
           {tx("Ainda não há ficha. Ela nasce do save de", "No card yet. It comes from the save of")}{" "}
@@ -118,6 +120,7 @@ const TrainerPage = () => {
       <AdventureJournal key={entry.rom} rom={entry.rom} />
       <IllustratedJournal rom={entry.rom} />
       <ChallengePanel key={`desafio:${entry.rom}`} rom={entry.rom} />
+      <ProgressMap key={`mapa:${entry.rom}`} rom={entry.rom} visitedTowns={entry.trainer.visitedTowns ?? undefined} />
       <p className="trainer-sub">{tx("Dados da última gravação lida deste jogo. Troque a aventura acima para consultar outro progresso.", "Data from this game's last recorded save. Select another adventure above to view other progress.")}</p>
 
       <section className="trainer-card" aria-label={tx("Cartão de treinador", "Trainer card")}>

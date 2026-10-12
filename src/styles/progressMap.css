@@ -1,0 +1,24 @@
+/* Mapa de progresso: esquema de Hoenn e a lista de lugares marcados. */
+.progress-map {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-1);
+}
+.progress-map h2 { font-family: var(--font-display); font-size: 1.1rem; margin-bottom: 10px; }
+.progress-map h3 {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin: 18px 0 8px;
+}
+.progress-map-svg { width: 100%; max-width: 720px; display: block; margin: 8px 0; }
+.progress-map-svg line { stroke: var(--border-strong); stroke-width: 0.5; stroke-dasharray: 1.2 1.2; }
+.progress-map-svg line.is-visited { stroke: var(--accent); stroke-dasharray: none; }
+.progress-map-svg circle { fill: var(--surface-2); stroke: var(--text-dim); stroke-width: 0.5; }
+.progress-map-svg text { font-size: 2.6px; fill: var(--text-dim); }
+.progress-map-svg .is-visited circle { fill: var(--accent); stroke: var(--accent); }
+.progress-map-svg .is-visited text { fill: var(--text); }
+.progress-map .is-done { text-decoration: line-through; color: var(--text-dim); }

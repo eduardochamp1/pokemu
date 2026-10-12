@@ -10,6 +10,7 @@ import { reloadTrainerLog } from "../lib/trainerLog";
 import { reloadPlayerDex } from "../lib/playerDex";
 import { reloadSessions } from "../lib/sessions";
 import { reloadChallenges } from "../lib/challenge";
+import { reloadMapMarks } from "../lib/mapMarks";
 
 /**
  * Montar e restaurar a cápsula de uma ROM contra o core de verdade. Usado
@@ -63,4 +64,5 @@ export async function restoreCapsule(
   reloadPlayerDex();
   reloadSessions();
   reloadChallenges();
+  reloadMapMarks();
 }

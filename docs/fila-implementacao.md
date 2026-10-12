@@ -18,7 +18,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 13. Álbum da jornada
 - [x] 14. Modo desafio
 - [x] 15. Ramificações de aventura
-- [ ] 16. Mapa de progresso
+- [x] 16. Mapa de progresso
 - [ ] 17. Ginásios, dano e comparação para Gen 1/2
 - [ ] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana
 - [ ] 19. CI no GitHub

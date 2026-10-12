@@ -137,6 +137,7 @@ const POR_NOME: { key: string; shape: "array" | "record" }[] = [
   { key: "pokedex:player-dex", shape: "record" },
   { key: "pokedex:sessions", shape: "record" },
   { key: "pokedex:challenges", shape: "record" },
+  { key: "pokedex:map-marks", shape: "record" },
 ];
 
 /**
