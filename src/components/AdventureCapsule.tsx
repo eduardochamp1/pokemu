@@ -23,6 +23,7 @@ import { reloadLegacyAdventures } from "../lib/legacyAdventures";
 import { reloadTrainerLog } from "../lib/trainerLog";
 import { reloadPlayerDex } from "../lib/playerDex";
 import { reloadSessions } from "../lib/sessions";
+import { reloadChallenges } from "../lib/challenge";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
 
@@ -154,6 +155,7 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
       reloadTrainerLog();
       reloadPlayerDex();
       reloadSessions();
+      reloadChallenges();
       onRestored();
       setPendente(null);
       setAviso(t(`Aventura de ${adventureLabel(target)} restaurada.`, `${adventureLabel(target)} adventure restored.`));

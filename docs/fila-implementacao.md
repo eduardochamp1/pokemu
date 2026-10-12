@@ -16,7 +16,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 11. Preparação para o próximo líder
 - [x] 12. Guia com dicas em três níveis
 - [x] 13. Álbum da jornada
-- [ ] 14. Modo desafio
+- [x] 14. Modo desafio
 - [ ] 15. Ramificações de aventura
 - [ ] 16. Mapa de progresso
 - [ ] 17. Ginásios, dano e comparação para Gen 1/2
