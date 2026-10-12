@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLegacyAdventures } from "../lib/legacyAdventures";
+import { legacyBattleTeam } from "../lib/legacyBattle";
+import { loadCatalog, type Catalog } from "../lib/offlineCatalog";
+import { JOHTO_BADGES, resolveJohtoGyms } from "../data/gymLeadersJohto";
 import { Link } from "react-router-dom";
 import { useMoveDetails, usePokemonIndex, usePokemonsByNames } from "../hooks/usePokemon";
 import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
@@ -18,7 +22,23 @@ import { useLang, tr } from "../i18n/lang";
 import "../styles/trainer.css";
 import "../styles/gyms.css";
 
-type Jogo = "emerald" | "frlg";
+type Jogo = "emerald" | "frlg" | "gsc";
+
+/** O catálogo embarcado, carregado sob demanda: é o que resolve Johto. */
+function useCatalog(ativo: boolean): Catalog | null {
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  useEffect(() => {
+    if (!ativo || catalog) return;
+    let vivo = true;
+    void loadCatalog().then((c) => {
+      if (vivo) setCatalog(c);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [ativo, catalog]);
+  return catalog;
+}
 
 /** O seu time do save como `BattleMember`: tipos e golpes de Gen 3. */
 function useMeuTime(entry: TrainerEntry | undefined): BattleMember[] {
@@ -68,19 +88,31 @@ const GymsPage = () => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const entries = useTrainerEntries();
+  // Gen 2: o guia de Johto. Gen 1 fica de fora — a tabela de tipos era outra.
+  const johto = useLegacyAdventures().filter(e => e.save.generation === 2);
   const activeRom = useActiveAdventure();
   const [escolhido, setEscolhido] = useState<Jogo | null>(null);
   // O jogo da aventura ativa manda; sem ela (ou se ela não tem guia), o do
   // save mais recente.
   const daAtiva = entries.find(entry => entry.rom === activeRom && (entry.game ?? "emerald") !== "rs");
-  const jogo: Jogo = escolhido ?? ((daAtiva ?? entries[0])?.game === "frlg" ? "frlg" : "emerald");
-  const compatible = entries.filter(entry => (entry.game ?? "emerald") === jogo);
-  const { entry, matched } = pickAdventure(compatible, activeRom);
-  const gyms = jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
-  const insignias = badgesOf(jogo);
-  const doSave = entry && (entry.game ?? "emerald") === jogo ? entry.trainer.badges : null;
+  const ativaEmJohto = johto.some(e => e.rom === activeRom);
+  const jogo: Jogo = escolhido
+    ?? (ativaEmJohto ? "gsc" : (daAtiva ?? entries[0])?.game === "frlg" ? "frlg" : !daAtiva && !entries.length && johto.length ? "gsc" : "emerald");
+  const catalog = useCatalog(jogo === "gsc");
+
+  const gen3Compativeis = jogo === "gsc" ? [] : entries.filter(entry => (entry.game ?? "emerald") === jogo);
+  const compatible: { rom: string }[] = jogo === "gsc" ? johto : gen3Compativeis;
+  const { entry: escolhida, matched } = pickAdventure(compatible, activeRom);
+  const entry = jogo === "gsc" ? undefined : gen3Compativeis.find(e => e.rom === escolhida?.rom);
+  const legacy = jogo === "gsc" ? johto.find(e => e.rom === escolhida?.rom) : undefined;
+
+  const gyms = jogo === "gsc" ? (catalog ? resolveJohtoGyms(catalog) : []) : jogo === "frlg" ? FRLG_GYMS : EMERALD_GYMS;
+  const insignias = jogo === "gsc" ? JOHTO_BADGES : badgesOf(jogo);
+  // Em Gen 2 o save tem 16 insígnias: as oito primeiras são as de Johto.
+  const doSave = jogo === "gsc" ? (legacy ? legacy.save.trainer.badges.slice(0, 8) : null) : entry ? entry.trainer.badges : null;
   const proximo = nextGym(doSave);
-  const meuTime = useMeuTime(entry);
+  const timeGen3 = useMeuTime(entry);
+  const meuTime = jogo === "gsc" ? (catalog && legacy ? legacyBattleTeam(catalog, legacy.save) : []) : timeGen3;
 
   return (
     <div className="trainer-shell">
@@ -91,19 +123,23 @@ const GymsPage = () => {
           <select value={jogo} onChange={(e) => setEscolhido(e.target.value as Jogo)}>
             <option value="emerald">Emerald</option>
             <option value="frlg">FireRed/LeafGreen</option>
+            <option value="gsc">Gold/Silver/Crystal</option>
           </select>
         </label>
       </header>
       <label className="page-selector">{t("Time da aventura", "Adventure team")}
-        <select value={entry?.rom ?? ""} onChange={event => setActiveAdventure(event.target.value)} disabled={!compatible.length}>
+        <select value={escolhida?.rom ?? ""} onChange={event => setActiveAdventure(event.target.value)} disabled={!compatible.length}>
           {!compatible.length && <option value="">{t("Sem save compatível — consultando os líderes", "No compatible save — viewing leaders")}</option>}
           {compatible.map(entry => <option key={entry.rom} value={entry.rom}>{entry.rom.replace(/\.[^.]+$/, "")}</option>)}
         </select>
       </label>
-      {activeRom && !matched && escolhido === null && <p className="page-scope" role="status">{t(`A aventura ativa (${adventureLabel(activeRom)}) não tem guia de ginásios; mostrando ${entry ? adventureLabel(entry.rom) : "só os líderes"}.`, `The active adventure (${adventureLabel(activeRom)}) has no gym guide; showing ${entry ? adventureLabel(entry.rom) : "leaders only"}.`)}</p>}
-      <p className="page-scope">{t("Guia disponível para Emerald e FireRed/LeafGreen. Só comparamos times de saves do jogo selecionado. Gen 1, Gen 2 e Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
+      {activeRom && !matched && escolhido === null && <p className="page-scope" role="status">{t(`A aventura ativa (${adventureLabel(activeRom)}) não tem guia de ginásios; mostrando ${escolhida ? adventureLabel(escolhida.rom) : "só os líderes"}.`, `The active adventure (${adventureLabel(activeRom)}) has no gym guide; showing ${escolhida ? adventureLabel(escolhida.rom) : "leaders only"}.`)}</p>}
+      <p className="page-scope">{t("Guia disponível para Emerald, FireRed/LeafGreen e os oito líderes de Johto em Gold/Silver/Crystal. Só comparamos times de saves do jogo selecionado. Gen 1 e Ruby/Sapphire ainda não têm guia próprio.", "Guide available for Emerald and FireRed/LeafGreen. Only saves matching the selected game are compared. Gen 1, Gen 2 and Ruby/Sapphire do not yet have their own guide.")}</p>
       <p className="trainer-sub">
-        {t(
+        {jogo === "gsc" ? t(
+          "Times de Johto transcritos de memória da decompilação (pret/pokecrystal) e ainda não conferidos linha a linha. A conta usa a tabela de tipos da Gen 2, que é a mesma da Gen 3.",
+          "Johto teams transcribed from memory of the decompilation (pret/pokecrystal), not yet checked line by line. The math uses the Gen 2 type chart, which matches Gen 3."
+        ) : t(
           "Times tirados da decompilação (pret/pokeemerald e pret/pokefirered): a primeira luta de cada líder. Ruby/Sapphire têm times um pouco diferentes.",
           "Teams taken from the decompilation (pret/pokeemerald and pret/pokefirered): each leader's first battle. Ruby/Sapphire have slightly different teams."
         )}{" "}
@@ -124,6 +160,7 @@ const GymsPage = () => {
             ganho={doSave?.[i] ?? false}
             proximo={doSave !== null && proximo === i}
             meuTime={meuTime}
+            comCalculadora={jogo !== "gsc"}
           />
         ))}
       </ol>
@@ -137,9 +174,11 @@ interface CardProps {
   ganho: boolean;
   proximo: boolean;
   meuTime: BattleMember[];
+  /** A calculadora de dano é de Gen 3: em Johto os atalhos para ela não aparecem. */
+  comCalculadora: boolean;
 }
 
-const GymCard = ({ gym, badge, ganho, proximo, meuTime }: CardProps) => {
+const GymCard = ({ gym, badge, ganho, proximo, meuTime, comCalculadora }: CardProps) => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const ranking = meuTime.length ? rankForGym(meuTime, gym) : [];
@@ -197,8 +236,8 @@ const GymCard = ({ gym, badge, ganho, proximo, meuTime }: CardProps) => {
                   </li>
                 )}
               </ul>
-              <p className="trainer-sub">{t("Abrir na calculadora de dano:", "Open in the damage calculator:")}</p>
-              <ul className="gym-prep-links">
+              {comCalculadora && <p className="trainer-sub">{t("Abrir na calculadora de dano:", "Open in the damage calculator:")}</p>}
+              {comCalculadora && <ul className="gym-prep-links">
                 {prep.scenarios.map((s, k) => (
                   <li key={k}>
                     <Link to={scenarioUrl(s.attackerIndex, s.defender.species, s.defender.level)}>
@@ -206,7 +245,7 @@ const GymCard = ({ gym, badge, ganho, proximo, meuTime }: CardProps) => {
                     </Link>
                   </li>
                 ))}
-              </ul>
+              </ul>}
             </div>
           )}
           <div className="gym-tabela-rolagem">

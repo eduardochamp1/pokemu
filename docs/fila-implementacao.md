@@ -19,7 +19,7 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - [x] 14. Modo desafio
 - [x] 15. Ramificações de aventura
 - [x] 16. Mapa de progresso
-- [ ] 17. Ginásios, dano e comparação para Gen 1/2
+- [x] 17. Ginásios, dano e comparação para Gen 1/2 — **parcial**, ver notas
 - [ ] 18. Leitores de save: validar com saves reais (só leitura), nível no PC de Gen 1, Gen 2 japonesa e coreana
 - [ ] 19. CI no GitHub
 - [ ] 20. Renomear os caches `pokedex-*` do service worker sem perder dados
@@ -66,6 +66,25 @@ concluído tem typecheck, lint e testes passando e um commit no `main`.
 - Palco vazio: botões para abrir a biblioteca ou adicionar um arquivo.
 - Ficou de fora do redesenho: navegação lateral, moldura menor do emulador,
   painel recolhível e a unificação dos tokens visuais.
+
+### 17. Gen 1/2 nas ferramentas (parcial)
+
+Feito:
+- Guia de ginásios para os oito líderes de Johto (Gold/Silver/Crystal), com o
+  time lido do save de Gen 2. Os times foram transcritos de memória da
+  decompilação e **não foram conferidos linha a linha**; o teste garante só
+  que toda espécie e todo golpe existem.
+- Comparação de dois saves de Gen 1 ou Gen 2 em "Comparar saves".
+
+Ficou de fora, e por quê:
+- **Ginásios de Gen 1.** A tabela de tipos era outra (sem Aço e Sombrio,
+  Fantasma não atingia Psíquico, Inseto e Veneno se batiam) e vários golpes
+  tinham outro tipo (Bite, Gust, Karate Chop). Precisa de tabela e de dados
+  de golpe próprios da Gen 1 antes de dar conselho.
+- **Os oito ginásios de Kanto em Gold/Silver/Crystal.**
+- **Cálculo de dano de Gen 1 e Gen 2.** A fórmula, os críticos e os status
+  (DVs e experiência de status) são outros; a calculadora atual segue a
+  decompilação de Emerald e não serve de base.
 
 ## Dúvidas para o usuário
 

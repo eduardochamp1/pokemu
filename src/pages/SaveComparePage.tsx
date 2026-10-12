@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import LegacyCompare from "../components/LegacyCompare";
 import { Link } from "react-router-dom";
 import { entryFromSave, useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
 import { compareEntries, type RowKey } from "../lib/compareSaves";
@@ -168,6 +169,8 @@ const SaveComparePage = () => {
           </section>
         </>
       )}
+
+      <LegacyCompare />
     </div>
   );
 };
