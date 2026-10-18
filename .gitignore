@@ -38,9 +38,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Claude Code local session files
+# Documentos de trabalho e arquivos de ferramentas de IA: planos, filas,
+# brainstorms, auditorias e estudos ficam na maquina, fora do repositorio.
+docs/
 .claude/
 CLAUDE.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.windsurfrules
+.github/copilot-instructions.md
+.aider*
+.continue/
 
 # ROMs locais — arquivos do usuario, nunca versionados nem publicados
 # (servidos so em dev/preview por vite-plugin-local-roms.ts)

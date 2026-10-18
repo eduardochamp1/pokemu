@@ -237,8 +237,9 @@ têm leitores próprios de treinador, time, Pokédex e PC. Os dados aparecem no
 painel do jogo e em **Treinador**, e entram no backup de **Seus dados**.
 Gen 2 inclui recuperação da cópia de segurança quando o bloco principal não
 passa no checksum. DVs e experiência de status são preservados sem convertê-los
-em atributos de Gen 3. A calculadora de dano e o guia de ginásios continuam
-focados em Gen 3. Veja [compatibilidade e validação](docs/save-readers.md).
+em atributos de Gen 3. As edições japonesas de Gen 2 e a Gold/Silver coreana
+também são lidas; na coreana, os nomes não são decodificados. Guia de ginásios
+e calculadora de dano usam os dados e a tabela de tipos de cada geração.
 
 Para conferir uma ROM e, opcionalmente, seu save de bateria:
 `npm run save:check -- "<rom>" "<save.sav>"`.
@@ -278,9 +279,6 @@ navegador; nada vai para servidor.
 - **Sem rede** — o time, o dano e os ginásios usam um catálogo embarcado da
   Gen 3 quando a PokéAPI não responde.
 
-A fila do que foi feito, com o que ficou de fora de cada item, está em
-[docs/fila-implementacao.md](docs/fila-implementacao.md).
-
 ## 🛠️ Stack
 
 - **React 19** + **TypeScript** estrito, **Vite** e **React Router**
@@ -305,8 +303,9 @@ Use o menu **Pokemu → Abrir pasta de ROMs / Abrir pasta de saves** para acess�
 As ROMs e os saves pessoais não entram no pacote. Para trazer o progresso do
 navegador, exporte o `.sav` e o JSON de **Seus dados** e importe no aplicativo.
 Os recursos que consultam a PokéAPI precisam de internet; o emulador usa o core
-incluído no executável. A distribuição gerada localmente não tem assinatura digital;
-o que falta para assinar está em [docs/assinatura-windows.md](docs/assinatura-windows.md).
+incluído no executável. A distribuição gerada localmente não tem assinatura digital:
+para assinar falta um certificado de assinatura de código, e o Smart App Control
+do Windows pode bloquear o executável enquanto isso.
 
 
 ```bash
