@@ -3,6 +3,8 @@ import {
   CHALLENGE_KEY,
   areaUsed,
   capCheck,
+  ChallengeLimitError,
+  MAX_CUSTOM_RULES,
   gymCapSupported,
   endChallenge,
   isChallenge,
@@ -178,5 +180,14 @@ describe("limite com time de qualquer geração (PS-05)", () => {
     expect(gymCapSupported("frlg")).toBe(true);
     expect(gymCapSupported("rs")).toBe(false);
     expect(gymCapSupported(undefined)).toBe(false);
+  });
+});
+
+describe("tetos explícitos (PS-06)", () => {
+  it("passar do teto é ChallengeLimitError, não falha de armazenamento", () => {
+    startChallenge("a.gba", 1);
+    const regras = Array.from({ length: MAX_CUSTOM_RULES + 1 }, (_, i) => `regra ${i}`);
+    expect(() => updateChallenge("a.gba", { custom: regras })).toThrow(ChallengeLimitError);
+    expect(gravado()["a.gba"].custom).toEqual([]);
   });
 });

@@ -53,6 +53,19 @@ export const RULES: { id: string; pt: string; en: string }[] = [
 
 export const CHALLENGE_KEY = "pokedex:challenges";
 
+/** Tetos de cada lista. A tela os mostra antes de alguém esbarrar neles. */
+export const MAX_CUSTOM_RULES = 20;
+export const MAX_ENCOUNTERS = 500;
+export const MAX_LOSSES = 500;
+
+/** Uma lista do desafio chegou ao teto: não é problema de espaço do navegador. */
+export class ChallengeLimitError extends Error {
+  constructor(readonly list: "custom" | "encounters" | "losses", readonly max: number) {
+    super(`limite de ${max} em ${list}`);
+    this.name = "ChallengeLimitError";
+  }
+}
+
 const texto = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
 const quando = (v: unknown) => typeof v === "number" && Number.isFinite(v);
 
@@ -68,12 +81,12 @@ export function isChallenge(v: unknown): v is Challenge {
     Array.isArray(c.rules) &&
     c.rules.every((r) => RULES.some((k) => k.id === r)) &&
     Array.isArray(c.custom) &&
-    c.custom.length <= 20 &&
+    c.custom.length <= MAX_CUSTOM_RULES &&
     c.custom.every((r) => texto(r, 200)) &&
     (c.levelCap === undefined ||
       c.levelCap === "gym" ||
       (Number.isInteger(c.levelCap) && (c.levelCap as number) >= 1 && (c.levelCap as number) <= 100)) &&
-    listaDe(c.encounters, 500, (e) =>
+    listaDe(c.encounters, MAX_ENCOUNTERS, (e) =>
       texto(e.id, 60) &&
       texto(e.area, 80) &&
       (e.area as string).trim().length > 0 &&
@@ -81,7 +94,7 @@ export function isChallenge(v: unknown): v is Challenge {
       (e.species === undefined || texto(e.species, 40)) &&
       quando(e.at)
     ) &&
-    listaDe(c.losses, 500, (l) => texto(l.id, 60) && texto(l.name, 40) && (l.name as string).trim().length > 0 && texto(l.cause, 200) && quando(l.at))
+    listaDe(c.losses, MAX_LOSSES, (l) => texto(l.id, 60) && texto(l.name, 40) && (l.name as string).trim().length > 0 && texto(l.cause, 200) && quando(l.at))
   );
 }
 
@@ -132,6 +145,9 @@ export function updateChallenge(rom: string, patch: Partial<Omit<Challenge, "rom
   const atual = challenges[rom];
   if (!atual) throw new Error("No challenge for this game");
   const next = { ...atual, ...patch };
+  if (next.custom.length > MAX_CUSTOM_RULES) throw new ChallengeLimitError("custom", MAX_CUSTOM_RULES);
+  if (next.encounters.length > MAX_ENCOUNTERS) throw new ChallengeLimitError("encounters", MAX_ENCOUNTERS);
+  if (next.losses.length > MAX_LOSSES) throw new ChallengeLimitError("losses", MAX_LOSSES);
   if (!isChallenge(next)) throw new Error("Invalid challenge data");
   persist(rom, next);
 }

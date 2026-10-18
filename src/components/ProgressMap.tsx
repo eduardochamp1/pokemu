@@ -32,16 +32,19 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
   const [note, setNote] = useState("");
   const [erro, setErro] = useState<string | null>(null);
 
-  const salvar = (next: typeof marks) => {
+  /** Devolve se gravou: o formulário só se limpa depois de confirmado. */
+  const salvar = (next: typeof marks): boolean => {
     try {
       setMapMarks(rom, next);
       setErro(null);
+      return true;
     } catch (error) {
       setErro(
         error instanceof StaleWriteError
           ? t("Estas marcações mudaram em outra aba. A lista foi atualizada; confira e tente de novo.", "These marks changed in another tab. The list was refreshed; check it and try again.")
-          : t("Não foi possível guardar a marcação.", "Couldn't save the mark.")
+          : t("Não foi possível guardar a marcação. O que você digitou continua no formulário.", "Couldn't save the mark. What you typed is still in the form.")
       );
+      return false;
     }
   };
 
@@ -116,9 +119,10 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!place.trim() || marks.length >= MAX_MARKS) return;
-          salvar([...marks, { id: novoId(), place: place.trim().slice(0, 80), note: note.trim().slice(0, 300), at: Date.now() }]);
-          setPlace("");
-          setNote("");
+          if (salvar([...marks, { id: novoId(), place: place.trim().slice(0, 80), note: note.trim().slice(0, 300), at: Date.now() }])) {
+            setPlace("");
+            setNote("");
+          }
         }}
       >
         <label>
@@ -129,7 +133,12 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
           {t("Por que voltar", "Why come back")}
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={t("Precisa de Surf", "Needs Surf")} />
         </label>
-        <button type="submit" disabled={!place.trim()}>{t("Marcar", "Mark")}</button>
+        <button type="submit" disabled={!place.trim() || marks.length >= MAX_MARKS}>{t("Marcar", "Mark")}</button>
+        {marks.length >= MAX_MARKS && (
+          <small role="status">
+            {t(`Limite de ${MAX_MARKS} lugares. Apague um resolvido para marcar outro.`, `Limit of ${MAX_MARKS} places. Delete a resolved one to mark another.`)}
+          </small>
+        )}
       </form>
       {marks.length > 0 && (
         <ul className="ui-list">

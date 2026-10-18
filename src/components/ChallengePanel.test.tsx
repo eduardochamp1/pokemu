@@ -81,3 +81,29 @@ it("aventura de Gen 1/2: o time lido do save é conferido contra o limite fixo (
   const gym = screen.getByRole("option", { name: /próximo líder/ }) as HTMLOptionElement;
   expect(gym.disabled).toBe(true);
 });
+
+it("falha ao gravar mantém regra, encontro e perda digitados (PS-01)", async () => {
+  const { vi } = await import("vitest");
+  iniciar();
+  const preencher = () => {
+    fireEvent.change(screen.getByLabelText("Regra sua"), { target: { value: "Sem cura em batalha" } });
+    fireEvent.change(screen.getByLabelText("Área"), { target: { value: "Rota 102" } });
+    fireEvent.change(screen.getByLabelText("Pokémon"), { target: { value: "Ralts" } });
+    fireEvent.change(screen.getByLabelText("Quem"), { target: { value: "Zigzagoon" } });
+  };
+  preencher();
+  const espiao = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("quota");
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Registrar" })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: "Registrar" })[1]);
+  expect((screen.getByLabelText("Regra sua") as HTMLInputElement).value).toBe("Sem cura em batalha");
+  expect((screen.getByLabelText("Área") as HTMLInputElement).value).toBe("Rota 102");
+  expect((screen.getByLabelText("Quem") as HTMLInputElement).value).toBe("Zigzagoon");
+  expect(screen.getByRole("alert").textContent).toContain("continua no formulário");
+  espiao.mockRestore();
+
+  fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+  expect((screen.getByLabelText("Regra sua") as HTMLInputElement).value).toBe("");
+});

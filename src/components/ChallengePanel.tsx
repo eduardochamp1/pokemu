@@ -1,5 +1,9 @@
 import { useState } from "react";
 import {
+  ChallengeLimitError,
+  MAX_CUSTOM_RULES,
+  MAX_ENCOUNTERS,
+  MAX_LOSSES,
   RULES,
   areaUsed,
   capCheck,
@@ -51,16 +55,21 @@ export default function ChallengePanel({ rom }: { rom: string }) {
   const [regra, setRegra] = useState("");
   const [encerrando, setEncerrando] = useState(false);
 
-  const salvar = (acao: () => void) => {
+  /** Devolve se gravou: o formulário só se limpa depois de confirmado. */
+  const salvar = (acao: () => void): boolean => {
     try {
       acao();
       setErro(null);
+      return true;
     } catch (error) {
       setErro(
         error instanceof StaleWriteError
           ? t("Este desafio mudou em outra aba. Ele foi atualizado aqui; confira e tente de novo.", "This challenge changed in another tab. It was refreshed here; check it and try again.")
-          : t("Não foi possível guardar. Verifique o espaço do navegador.", "Couldn't save. Check browser storage.")
+          : error instanceof ChallengeLimitError
+            ? t(`Esta lista chegou ao limite de ${error.max} itens. Remova um para registrar outro.`, `This list reached its limit of ${error.max} items. Remove one to log another.`)
+            : t("Não foi possível guardar. Verifique o espaço do navegador. O que você digitou continua no formulário.", "Couldn't save. Check browser storage. What you typed is still in the form.")
       );
+      return false;
     }
   };
   const mudar = (patch: Parameters<typeof updateChallenge>[1]) => salvar(() => updateChallenge(rom, patch));
@@ -128,15 +137,17 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!regra.trim()) return;
-          mudar({ custom: [...challenge.custom, regra.trim().slice(0, 200)] });
-          setRegra("");
+          if (mudar({ custom: [...challenge.custom, regra.trim().slice(0, 200)] })) setRegra("");
         }}
       >
         <label>
           {t("Regra sua", "Your own rule")}
           <input value={regra} onChange={(e) => setRegra(e.target.value)} maxLength={200} />
         </label>
-        <button type="submit">{t("Adicionar", "Add")}</button>
+        <button type="submit" disabled={challenge.custom.length >= MAX_CUSTOM_RULES}>{t("Adicionar", "Add")}</button>
+        {challenge.custom.length >= MAX_CUSTOM_RULES && (
+          <small role="status">{t(`Limite de ${MAX_CUSTOM_RULES} regras pessoais.`, `Limit of ${MAX_CUSTOM_RULES} personal rules.`)}</small>
+        )}
       </form>
 
       <h3>{t("Limite de nível", "Level cap")}</h3>
@@ -198,14 +209,16 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!area.trim() || repetida) return;
-          mudar({
+          const ok = mudar({
             encounters: [
               ...challenge.encounters,
               { id: novoId(), area: area.trim().slice(0, 80), outcome: resultado, species: especie.trim().slice(0, 40) || undefined, at: Date.now() },
             ],
           });
-          setArea("");
-          setEspecie("");
+          if (ok) {
+            setArea("");
+            setEspecie("");
+          }
         }}
       >
         <label>
@@ -224,7 +237,10 @@ export default function ChallengePanel({ rom }: { rom: string }) {
             <option value="skipped">{rotuloResultado("skipped")}</option>
           </select>
         </label>
-        <button type="submit" disabled={!area.trim() || repetida}>{t("Registrar", "Log")}</button>
+        <button type="submit" disabled={!area.trim() || repetida || challenge.encounters.length >= MAX_ENCOUNTERS}>{t("Registrar", "Log")}</button>
+        {challenge.encounters.length >= MAX_ENCOUNTERS && (
+          <small role="status">{t(`Limite de ${MAX_ENCOUNTERS} encontros.`, `Limit of ${MAX_ENCOUNTERS} encounters.`)}</small>
+        )}
       </form>
       {repetida && <p role="status" className="challenge-alert">{t("Esta área já tem um encontro registrado.", "This area already has a logged encounter.")}</p>}
       {challenge.encounters.length > 0 && (
@@ -251,9 +267,10 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!perda.trim()) return;
-          mudar({ losses: [...challenge.losses, { id: novoId(), name: perda.trim().slice(0, 40), cause: causa.trim().slice(0, 200), at: Date.now() }] });
-          setPerda("");
-          setCausa("");
+          if (mudar({ losses: [...challenge.losses, { id: novoId(), name: perda.trim().slice(0, 40), cause: causa.trim().slice(0, 200), at: Date.now() }] })) {
+            setPerda("");
+            setCausa("");
+          }
         }}
       >
         <label>
@@ -264,7 +281,10 @@ export default function ChallengePanel({ rom }: { rom: string }) {
           {t("Como foi", "What happened")}
           <input value={causa} onChange={(e) => setCausa(e.target.value)} maxLength={200} />
         </label>
-        <button type="submit" disabled={!perda.trim()}>{t("Registrar", "Log")}</button>
+        <button type="submit" disabled={!perda.trim() || challenge.losses.length >= MAX_LOSSES}>{t("Registrar", "Log")}</button>
+        {challenge.losses.length >= MAX_LOSSES && (
+          <small role="status">{t(`Limite de ${MAX_LOSSES} perdas.`, `Limit of ${MAX_LOSSES} losses.`)}</small>
+        )}
       </form>
       {challenge.losses.length > 0 && (
         <ul className="ui-list">
