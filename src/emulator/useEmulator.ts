@@ -42,7 +42,8 @@ import { parseGen3Save, type Gen3PartyMember } from "./saveParse/gen3";
 import { parseLegacySave, type LegacySave } from "./saveParse/legacy";
 import { recordLegacyAdventure } from "../lib/legacyAdventures";
 import { backfillIdentities, registerLoadedRom } from "./romRegistration";
-import type { RomSource } from "../lib/romIdentity";
+import { loadRegistry, sha256Hex, type RomSource } from "../lib/romIdentity";
+import { findRomConflict } from "../lib/romConflict";
 import { recordPlayerDex } from "../lib/playerDex";
 import { recordTrainerSave } from "../lib/trainerLog";
 import { getLang, tr } from "../i18n/lang";
@@ -337,6 +338,8 @@ export function useEmulator() {
   const [saves, setSaves] = useState<string[]>([]);
   const [volume, setVolumeState] = useState(getVolume);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Arquivo com nome conhecido e conteúdo novo, esperando a pessoa decidir. */
+  const [contentChange, setContentChange] = useState<{ file: File; source: RomSource; rom: string } | null>(null);
   /**
    * O jogo identificado pelo cabecalho do cartucho, quando da.
    *
@@ -718,7 +721,7 @@ export function useEmulator() {
   );
 
   const playFile = useCallback(
-    async (file: File, source: RomSource = "upload") => {
+    async (file: File, source: RomSource = "upload", acceptContentChange = false) => {
       const core = coreRef.current;
       if (!core) return;
       if (!isSupportedRom(file.name)) {
@@ -738,6 +741,59 @@ export function useEmulator() {
       const flatName = file.name.replace(/^.*[/\\]/, "");
       const flatFile =
         flatName === file.name ? file : new File([file], flatName);
+
+      // Antes de qualquer byte ir para o core: nome que o core não separa
+      // (subpastas, mesma base com outra extensão) é recusado, e conteúdo
+      // novo sob um nome conhecido espera a pessoa dizer que é a mesma
+      // aventura.
+      setContentChange(null);
+      const conflito = findRomConflict({
+        path: file.name,
+        hash: await sha256Hex(new Uint8Array(await flatFile.arrayBuffer())),
+        registry: loadRegistry(localStorage),
+        coreRoms: (() => {
+          try {
+            return core.listRoms() ?? [];
+          } catch {
+            return [];
+          }
+        })(),
+        folderPaths: localRomsRef.current?.map((r) => r.fileName) ?? null,
+      });
+      if (conflito?.kind === "same-name-in-folders") {
+        falhaAoCarregar(
+          anterior,
+          tr(
+            getLang(),
+            `Há mais de um "${flatName}" na pasta (${conflito.paths.join(", ")}). O emulador guarda o save pelo nome: renomeie um deles para não misturar as aventuras.`,
+            `There's more than one "${flatName}" in the folder (${conflito.paths.join(", ")}). The emulator keeps saves by name: rename one so the adventures don't mix.`
+          )
+        );
+        return;
+      }
+      if (conflito?.kind === "same-save-name") {
+        falhaAoCarregar(
+          anterior,
+          tr(
+            getLang(),
+            `"${flatName}" e "${conflito.other}" usariam o mesmo save. Renomeie um dos dois antes de jogar.`,
+            `"${flatName}" and "${conflito.other}" would share the same save. Rename one of them before playing.`
+          )
+        );
+        return;
+      }
+      if (conflito?.kind === "content-changed" && !acceptContentChange) {
+        setContentChange({ file, source, rom: flatName });
+        falhaAoCarregar(
+          anterior,
+          tr(
+            getLang(),
+            `"${flatName}" já foi usado com outro conteúdo. Se for um patch ou versão nova do mesmo jogo, confirme para continuar a mesma aventura; se for outro jogo, renomeie o arquivo.`,
+            `"${flatName}" was used before with different content. If it's a patch or new version of the same game, confirm to continue the same adventure; if it's another game, rename the file.`
+          )
+        );
+        return;
+      }
 
       // Os 192 primeiros bytes bastam, e o arquivo ja esta em memoria.
       setRomId(
@@ -1530,6 +1586,14 @@ export function useEmulator() {
     romId,
     notice,
     dismissNotice: () => setNotice(null),
+    /** Nome conhecido com conteúdo novo, esperando confirmação. */
+    contentChange: contentChange && { rom: contentChange.rom },
+    confirmContentChange: () => {
+      if (!contentChange) return;
+      setContentChange(null);
+      void playFile(contentChange.file, contentChange.source, true);
+    },
+    cancelContentChange: () => setContentChange(null),
     /** Para quem dirige partes da tela de fora daqui (escala, tela cheia). */
     notify: setNotice,
     playFile,

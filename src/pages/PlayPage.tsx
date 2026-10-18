@@ -132,6 +132,19 @@ const PlayPage = () => {
         </section>
       )}
 
+      {emu.contentChange && (
+        <section className="play-diag" role="group" aria-label={tx("Conteúdo novo com nome conhecido", "New content under a known name")}>
+          <p>
+            {tx(
+              `Continuar a aventura de "${emu.contentChange.rom}" com este arquivo? O save atual será usado por ele.`,
+              `Continue the "${emu.contentChange.rom}" adventure with this file? The current save will be used by it.`
+            )}
+          </p>
+          <button type="button" onClick={emu.confirmContentChange}>{tx("É o mesmo jogo, continuar", "Same game, continue")}</button>{" "}
+          <button type="button" className="play-linkish" onClick={emu.cancelContentChange}>{tx("Cancelar", "Cancel")}</button>
+        </section>
+      )}
+
       <PlayAnnouncer status={emu.status} notice={emu.notice} />
       {/* Sem role: quem anuncia o aviso é o PlayAnnouncer, que está sempre
           montado — este div nasce já com o texto e seria anunciado duas vezes. */}

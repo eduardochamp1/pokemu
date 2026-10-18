@@ -41,6 +41,8 @@ const dublê = vi.hoisted(() => ({
   syncFalha: false,
   /** Faz `loadGame` recusar, como acontece com ROM corrompida. */
   loadFalha: false,
+  /** Quantas ROMs subiram para o core. */
+  uploads: 0,
   rom: null as string | null,
   save: null as Uint8Array | null,
   header: null as Uint8Array | null,
@@ -75,7 +77,10 @@ vi.mock("./core", () => {
             new Error("Error syncing app data to IndexedDB: QuotaExceededError")
           )
         : Promise.resolve(),
-    uploadRom: (_arquivo: unknown, pronto: () => void) => pronto(),
+    uploadRom: (_arquivo: unknown, pronto: () => void) => {
+      dublê.uploads++;
+      pronto();
+    },
     loadGame: () => !dublê.loadFalha,
     filePaths: () => ({ gamePath: "/data/games", screenshotsPath: "/data/shots" }),
     saveStateSlot: () => true,
@@ -298,6 +303,34 @@ describe("useEmulator — ROM nova que falha", () => {
     });
 
     expect(emu.atual.status.kind).toBe("error");
+  });
+});
+
+describe("useEmulator — nome conhecido com outro conteúdo (AUD-06)", () => {
+  it("não sobe para o core sem a pessoa confirmar; confirmando, joga", async () => {
+    const emu = await montar();
+    localStorage.setItem(
+      "pokedex:rom-identity",
+      JSON.stringify({ "demo.gba": { hash: "0".repeat(64), adventureId: "a", size: 8, firstSeen: 0 } })
+    );
+    const antes = dublê.uploads;
+    await act(async () => {
+      await emu.atual.playFile(new File([new Uint8Array(8).fill(7)], "demo.gba"));
+    });
+    expect(dublê.uploads).toBe(antes);
+    expect(emu.atual.contentChange).toEqual({ rom: "demo.gba" });
+    expect(emu.atual.status.kind).toBe("error");
+
+    await act(async () => {
+      emu.atual.confirmContentChange();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(dublê.uploads).toBe(antes + 1);
+    expect(emu.atual.contentChange).toBeNull();
+    localStorage.removeItem("pokedex:rom-identity");
   });
 });
 

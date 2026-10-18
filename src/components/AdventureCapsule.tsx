@@ -9,6 +9,7 @@ import {
   type RestoreStep,
 } from "../lib/capsule";
 import { loadRegistry } from "../lib/romIdentity";
+import { capsuleTarget } from "../lib/romConflict";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
 import { incompleteMessage, recoveryMessage, restoreFailureMessage } from "./capsuleMessages";
@@ -24,9 +25,13 @@ interface Props {
 
 interface Pendente {
   capsule: Capsule;
-  /** O nome sob o qual os arquivos serão gravados neste aparelho. */
+  /** O nome sob o qual os arquivos serão gravados neste aparelho; vazio até escolher. */
   target: string;
   steps: RestoreStep[];
+  /** Mais de uma campanha com o mesmo conteúdo: a pessoa escolhe. */
+  candidates: string[];
+  /** Há aqui uma ROM com o nome da cápsula, mas outro conteúdo. */
+  nameMismatch: boolean;
 }
 
 /**
@@ -114,20 +119,34 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
     try {
       const core = await getCore();
       const capsule = res.capsule;
-      // Mesmo conteúdo com outro nome neste aparelho: vale o nome daqui.
-      const registry = loadRegistry(localStorage);
-      const mesmoHash = capsule.rom.hash
-        ? Object.entries(registry).find(([, e]) => e.hash === capsule.rom.hash)?.[0]
-        : undefined;
-      const target = mesmoHash ?? capsule.rom.fileName;
-      setPendente({ capsule, target, steps: planFor(core, capsule, target) });
+      // A mesma aventura (ID) vence; mesmo conteúdo só sugere, e com duas
+      // campanhas iguais quem escolhe é a pessoa.
+      const destino = capsuleTarget(capsule, loadRegistry(localStorage));
+      const target = destino.target ?? "";
+      setPendente({
+        capsule,
+        target,
+        steps: target ? planFor(core, capsule, target) : [],
+        candidates: destino.candidates,
+        nameMismatch: destino.nameMismatch,
+      });
+    } catch {
+      setAviso(t("O emulador ainda não está pronto para restaurar.", "The emulator isn't ready to restore yet."));
+    }
+  };
+
+  const escolherDestino = async (target: string) => {
+    if (!pendente) return;
+    try {
+      const core = await getCore();
+      setPendente({ ...pendente, target, steps: target ? planFor(core, pendente.capsule, target) : [] });
     } catch {
       setAviso(t("O emulador ainda não está pronto para restaurar.", "The emulator isn't ready to restore yet."));
     }
   };
 
   const restaurar = async () => {
-    if (!pendente) return;
+    if (!pendente || !pendente.target) return;
     const { capsule, target, steps } = pendente;
     if (getLoadedRom() === target) {
       setAviso(t("Feche este jogo antes de restaurar a cápsula dele.", "Close this game before restoring its capsule."));
@@ -206,10 +225,27 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
         <div className="capsule-preview" role="group" aria-label={t("Prévia da restauração", "Restore preview")}>
           <p>
             <strong>{adventureLabel(pendente.capsule.rom.fileName)}</strong>
-            {pendente.target !== pendente.capsule.rom.fileName && (
+            {pendente.target && pendente.target !== pendente.capsule.rom.fileName && (
               <> → {t("neste aparelho:", "on this device:")} {adventureLabel(pendente.target)}</>
             )}
           </p>
+          {pendente.candidates.length > 1 && (
+            <label>
+              {t("Este conteúdo tem mais de uma aventura aqui. Restaurar em:", "This content has more than one adventure here. Restore into:")}{" "}
+              <select value={pendente.target} onChange={(e) => void escolherDestino(e.target.value)}>
+                <option value="">{t("Escolha a aventura…", "Choose the adventure…")}</option>
+                {pendente.candidates.map((c) => <option key={c} value={c}>{adventureLabel(c)}</option>)}
+              </select>
+            </label>
+          )}
+          {pendente.nameMismatch && (
+            <p className="play-panel-hint">
+              {t(
+                `Atenção: o "${pendente.capsule.rom.fileName}" deste aparelho tem outro conteúdo (outra versão ou outro jogo).`,
+                `Note: this device's "${pendente.capsule.rom.fileName}" has different content (another version or game).`
+              )}
+            </p>
+          )}
           <ul>
             <li>
               {t("Exportada em", "Exported on")}{" "}
@@ -243,7 +279,7 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
             </li>
           </ul>
           <div className="play-save-actions">
-            <button type="button" onClick={() => void restaurar()} disabled={ocupado}>
+            <button type="button" onClick={() => void restaurar()} disabled={ocupado || !pendente.target}>
               {t("Restaurar esta aventura", "Restore this adventure")}
             </button>
             <button type="button" className="play-linkish" onClick={() => setPendente(null)}>
