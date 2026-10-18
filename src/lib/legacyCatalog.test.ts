@@ -151,3 +151,11 @@ describe("time do save", () => {
     expect(ranking.find((r) => r.member.name === "GASTLY")!.matchups[0].offense.mult).toBe(0);
   });
 });
+
+describe("nível desconhecido (E10)", () => {
+  it("membro sem nível lido fica fora da análise, em vez de entrar com nível inventado", async () => {
+    const semNivel = { ...mon(81, "MAG", 20, [84]), level: null } as unknown as ReturnType<typeof mon>;
+    const time = legacyBattleTeam(await loadLegacyCatalog(1), save(1, "red", [semNivel, mon(25, "PIKA", 12, [84])]));
+    expect(time.map((m) => [m.name, m.level])).toEqual([["PIKA", 12]]);
+  });
+});

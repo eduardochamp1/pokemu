@@ -263,6 +263,22 @@ async function gen2(slugsDeGolpe, slugsDeEspecie) {
   const species = bases.map((b, i) => [i + 1, slugsDeEspecie.get(i + 1), b.types, b.stats]);
 
   const parties = await texto(repo, "data/trainers/parties.asm");
+  // Os times vêm de Crystal; Gold/Silver usam os mesmos? Comprovado aqui, a
+  // cada geração do catálogo: se a decompilação de Gold divergir em algum
+  // líder, o script para em vez de mostrar o time de Crystal para quem joga
+  // Gold ou Silver.
+  const partiesGs = await texto("pokegold", "data/trainers/parties.asm");
+  const linhasDe = (t, label) =>
+    (t.split(`${label}Group:`)[1]?.split("db -1")[0] ?? "")
+      .split("\n")
+      .map((l) => semComentario(l).trim())
+      .filter((l) => /^db\s+\d/.test(l))
+      .join("|");
+  for (const [label] of JOHTO_E_KANTO) {
+    if (linhasDe(parties, label) !== linhasDe(partiesGs, label)) {
+      throw new Error(`time de ${label} difere entre Gold/Silver e Crystal: separe os conjuntos`);
+    }
+  }
   const gyms = JOHTO_E_KANTO.map(([label, city, type, badge]) => {
     const bloco = parties.split(`${label}Group:`)[1]?.split("db -1")[0];
     if (!bloco) throw new Error(`party de ${label} não encontrada`);
@@ -302,7 +318,7 @@ async function main() {
   await writeFile(join(OUT, "gen1.json"), JSON.stringify(g1) + "\n");
   await writeFile(
     join(OUT, "gen2.json"),
-    JSON.stringify({ source: "https://github.com/pret/pokecrystal", generatedAt: hoje, generation: 2, ...g2 }) + "\n"
+    JSON.stringify({ source: "https://github.com/pret/pokecrystal (times dos líderes conferidos iguais em https://github.com/pret/pokegold)", generatedAt: hoje, generation: 2, ...g2 }) + "\n"
   );
   console.log(`Pronto: gen1.json (${Math.round(JSON.stringify(g1).length / 1024)} kB) e gen2.json`);
 }

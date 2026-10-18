@@ -244,6 +244,31 @@ e calculadora de dano usam os dados e a tabela de tipos de cada geração.
 Para conferir uma ROM e, opcionalmente, seu save de bateria:
 `npm run save:check -- "<rom>" "<save.sav>"`.
 
+#### Tabela de suporte
+
+O que cada leitor faz hoje e de onde vem a confiança. "Sintético" quer dizer
+save montado em código no teste, com o layout das decompilações pret; "real"
+quer dizer conferido contra um `.sav` de cartucho de verdade.
+
+| Edição | Idioma | Treinador, time, Pokédex, PC | Ginásios e dano | Base dos testes |
+| --- | --- | --- | --- | --- |
+| Ruby, Sapphire | internacional | sim; sem dinheiro, insígnias nem cidades | ginásios não; dano Gen 3 com o time | sintético (`gen3.test.ts`) |
+| Emerald | internacional | sim, com insígnias e cidades | sim | sintético + real opcional (`gen3Real.test.ts`, via `GEN3_SAVE`) |
+| FireRed, LeafGreen | internacional | sim, com insígnias; sem cidades | sim | sintético |
+| Red, Blue | internacional | sim | sim (Red/Blue) | sintético (`legacy.test.ts`) |
+| Yellow | internacional | sim | sim (times de Yellow) | sintético |
+| Green | japonês | sim | sim (times de Red/Blue) | sintético; Red e Blue japoneses usam o mesmo leitor, sem teste próprio |
+| Gold, Silver | internacional, japonês | sim | sim — times iguais aos de Crystal, conferido contra `pokegold` | sintético |
+| Gold, Silver | coreano | sim, sem os nomes (não decodificados) | sim | sintético |
+| Crystal | internacional, japonês | sim | sim | sintético |
+
+Ainda sem conferência contra saves reais de Gen 1 e Gen 2: os layouts vêm das
+decompilações e os testes montam os bytes, mas nenhum `.sav` de cartucho dessas
+gerações foi lido nos testes. ROM hack com mapa de memória diferente é recusada
+ou lida como a edição base — o site não promete suporte a hacks. Onde o save
+não diz um dado (nível fora do time, cidades fora de Emerald), a tela mostra
+"desconhecido" ou deixa de fora, sem inventar zero.
+
 ### Companheiro de aventura
 
 O que o site faz com o que lê do save e com o que você anota. Tudo fica neste

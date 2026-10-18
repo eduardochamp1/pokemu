@@ -95,20 +95,22 @@ export function legacyGyms(c: LegacyCatalog, set: GymSet): Gym[] {
 /**
  * O time de um save de Gen 1 ou Gen 2 na forma que o guia de ginásios usa,
  * com os tipos e os golpes **daquela geração**. Ovo fica de fora: não luta.
+ * Membro sem nível lido também: a análise usa o nível, e um nível inventado
+ * (1, 0) daria um resultado que parece medido e não é.
  */
 export function legacyBattleTeam(c: LegacyCatalog, save: LegacySave): BattleMember[] {
   if (save.generation !== c.generation) return [];
   const especie = new Map(c.species.map((s) => [s[0], s]));
   const golpe = new Map(c.moves.map((m) => [m[0], m]));
   return save.party.flatMap((mon): BattleMember[] => {
-    if (mon.egg) return [];
+    if (mon.egg || mon.level === null) return [];
     const s = especie.get(mon.national);
     if (!s) return [];
     return [
       {
         name: mon.nickname,
         national: mon.national,
-        level: mon.level ?? 1,
+        level: mon.level,
         types: s[2] as TypeName[],
         moves: mon.moves.flatMap((mv) => {
           const g = golpe.get(mv.id);
