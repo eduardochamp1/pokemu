@@ -555,13 +555,27 @@ img { display: block; max-width: 100%; }
 /* ========= Navbar responsiva ========= */
 
 @media (max-width: 860px) {
-  /* Rolar em vez de cortar: os links nao cabem ao lado da marca. */
+  /* Os links ganham uma linha propria, abaixo da marca e da cauda. Antes
+     dividiam a linha com elas alinhados a direita: o que nao cabia saia pela
+     esquerda, em x negativo, onde a rolagem nunca chega — Jogos, Aventuras e
+     Ginasios sumiam a 375 px. Agora comecam na esquerda e o excesso rola. */
+  :root { --nav-offset: 96px; }
+  .navbar {
+    flex-wrap: wrap;
+    height: auto;
+    row-gap: 0;
+  }
+  .nav-tail { min-height: 48px; }
   .nav-links {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: flex-start;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    flex: 1 1 auto;
-    justify-content: flex-end;
+    scroll-padding-inline: 14px;
+    /* Um degradê na borda direita diz que ha mais para rolar. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
   }
   .nav-links::-webkit-scrollbar {
     display: none;

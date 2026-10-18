@@ -1,4 +1,5 @@
-import { Link, NavLink } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import ScanlineToggle from "./ScanlineToggle";
 import { InstallButton } from "./AppStatus";
 import LangToggle from "./LangToggle";
@@ -14,13 +15,20 @@ const Navbar = () => {
   const pausado = usePausedGame();
   const t = useT();
   const ativa = useActiveAdventure();
+  // Em tela estreita os links rolam de lado: a página atual fica à vista.
+  const links = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const atual = links.current?.querySelector<HTMLElement>(".nav-link-active");
+    if (atual && typeof atual.scrollIntoView === "function") atual.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
   return (
     <nav className="navbar">
       <Link to="/" aria-label={t("Ir para a biblioteca", "Go to the library")} className="navbar-brand">
         <span className="navbar-pokeball" aria-hidden="true" />
         <span className="navbar-title">Pokemu</span>
       </Link>
-      <div className="nav-links">
+      <div className="nav-links" ref={links}>
         <NavLink to="/" end className={classe}>
           {t("Jogos", "Games")}
           {pausado && (
