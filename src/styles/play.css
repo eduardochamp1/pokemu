@@ -1312,3 +1312,22 @@
   .panel-toggle { display: none; }
   .play-layout.is-collapsed .play-sidebar { display: flex; }
 }
+
+/* Onde o progresso está guardado: discreto quando está tudo bem, à vista quando falha. */
+.play-persist {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  margin-bottom: 10px;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+.play-persist.is-failed {
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--pokeball-red);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: 0.82rem;
+}

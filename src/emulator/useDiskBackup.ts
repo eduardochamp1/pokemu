@@ -7,6 +7,11 @@ import {
   type LocalSave,
 } from "./storage";
 import type { mGBAEmulator } from "./types";
+import { getLoadedRom } from "./core";
+import { setDiskDurability } from "./durability";
+
+/** Intervalo mínimo entre duas gravações automáticas do mesmo jogo. */
+export const DISK_BACKUP_WINDOW_MS = 5000;
 
 /**
  * Ha progresso de verdade nestes bytes?
@@ -54,9 +59,13 @@ export function useDiskBackup(
 ) {
   /** null = pasta `saves/` indisponivel (producao). */
   const [localSaves, setLocalSaves] = useState<LocalSave[] | null>(null);
-  const lastBackupRef = useRef(0);
+  /** Último espelho que deu certo, por jogo: trocar de jogo não suprime o do outro. */
+  const ultimoRef = useRef<Record<string, number>>({});
+  /** A gravação final agendada de cada jogo, para o último evento da janela não se perder. */
+  const pendenteRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   /** A gravacao anterior falhou? Evita repetir o aviso a cada cinco segundos. */
   const falhouAntesRef = useRef(false);
+  const backupRef = useRef<((rom: string, opts?: { force?: boolean; quiet?: boolean }) => Promise<boolean>) | null>(null);
 
   const refreshLocalSaves = useCallback(async () => {
     setLocalSaves(await listLocalSaves());
@@ -66,15 +75,34 @@ export function useDiskBackup(
     void refreshLocalSaves();
   }, [refreshLocalSaves]);
 
+  useEffect(() => {
+    setDiskDurability({ available: localSaves !== null });
+  }, [localSaves]);
+
   const backupToDisk = useCallback(
-    async (romName: string, opts: { force?: boolean } = {}) => {
+    async (romName: string, opts: { force?: boolean; quiet?: boolean } = {}) => {
       const core = coreRef.current;
       if (!core || localSaves === null) return false;
 
-      // Throttle: o core dispara saveDataUpdated com frequencia.
+      // O core dispara saveDataUpdated com frequência. Dentro da janela, em
+      // vez de descartar, agenda uma gravação no fim dela — que lê o save
+      // daquele momento, o mais novo. O instante só conta quando grava.
       const now = Date.now();
-      if (!opts.force && now - lastBackupRef.current < 5000) return false;
-      lastBackupRef.current = now;
+      const passou = now - (ultimoRef.current[romName] ?? 0);
+      if (!opts.force && passou < DISK_BACKUP_WINDOW_MS) {
+        if (!pendenteRef.current[romName]) {
+          pendenteRef.current[romName] = setTimeout(() => {
+            delete pendenteRef.current[romName];
+            void backupRef.current?.(romName);
+          }, DISK_BACKUP_WINDOW_MS - passou);
+          setDiskDurability({ state: "pending" });
+        }
+        return false;
+      }
+      clearTimeout(pendenteRef.current[romName]);
+      delete pendenteRef.current[romName];
+      // O save na memória é o do jogo aberto: de outro jogo, não há o que copiar.
+      if (getLoadedRom() !== romName) return false;
 
       const data = core.getSave();
       if (!hasRealSaveData(data)) {
@@ -90,11 +118,14 @@ export function useDiskBackup(
       }
 
       const fileName = saveNameFor(romName);
+      setDiskDurability({ state: "saving" });
       try {
         await writeLocalSave(fileName, data);
+        ultimoRef.current[romName] = Date.now();
+        setDiskDurability({ state: "saved", lastOk: ultimoRef.current[romName], error: undefined });
         await refreshLocalSaves();
         falhouAntesRef.current = false;
-        if (opts.force) {
+        if (opts.force && !opts.quiet) {
           notify(`${fileName} copiado para saves/ (${data.length} bytes).`);
         }
         return true;
@@ -112,11 +143,30 @@ export function useDiskBackup(
           notify(`Não deu para gravar ${fileName} em saves/: ${motivo}`);
         }
         falhouAntesRef.current = true;
+        // Sem marcar o instante: o próximo evento tenta de novo.
+        setDiskDurability({ state: "failed", error: motivo });
         return false;
       }
     },
     [coreRef, localSaves, notify, refreshLocalSaves]
   );
+  useEffect(() => {
+    backupRef.current = backupToDisk;
+  }, [backupToDisk]);
+
+  /**
+   * Grava agora o que estava esperando o fim da janela. Para as transições —
+   * fechar o jogo, trocar de jogo, esconder a aba —, enquanto o jogo de antes
+   * ainda está carregado.
+   */
+  const flushDiskBackups = useCallback(async () => {
+    const pendentes = Object.keys(pendenteRef.current);
+    for (const rom of pendentes) {
+      clearTimeout(pendenteRef.current[rom]);
+      delete pendenteRef.current[rom];
+      await backupRef.current?.(rom, { force: true, quiet: true });
+    }
+  }, []);
 
   /** Traz um save da pasta `saves/` para dentro do core. */
   const restoreFromDisk = useCallback(
@@ -145,5 +195,5 @@ export function useDiskBackup(
     [coreRef, notify, refreshLibrary]
   );
 
-  return { localSaves, refreshLocalSaves, backupToDisk, restoreFromDisk };
+  return { localSaves, refreshLocalSaves, backupToDisk, flushDiskBackups, restoreFromDisk };
 }

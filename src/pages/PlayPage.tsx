@@ -26,6 +26,7 @@ import PlayStage from "./play/PlayStage";
 import LibraryTools from "./play/LibraryTools";
 import SavesPanel from "./play/SavesPanel";
 import SettingsPanel from "./play/SettingsPanel";
+import PersistStatus from "../components/PersistStatus";
 
 const PlayPage = () => {
   const p = usePlayPage();
@@ -144,6 +145,8 @@ const PlayPage = () => {
           <button type="button" className="play-linkish" onClick={emu.cancelContentChange}>{tx("Cancelar", "Cancel")}</button>
         </section>
       )}
+
+      {playing && currentRom && <PersistStatus rom={currentRom} onRetry={() => void emu.sync()} onExport={emu.exportSave} />}
 
       <PlayAnnouncer status={emu.status} notice={emu.notice} />
       {/* Sem role: quem anuncia o aviso é o PlayAnnouncer, que está sempre

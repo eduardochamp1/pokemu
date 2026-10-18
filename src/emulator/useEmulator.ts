@@ -51,6 +51,7 @@ import { MGBA_CORE_SETTINGS } from "./mgbaDefaults";
 import { TURBO_MULTIPLIER } from "./shortcuts";
 import { useDiagnostics } from "./useDiagnostics";
 import { useDiskBackup } from "./useDiskBackup";
+import { getDurability, requestPersist } from "./durability";
 import { useKeyBindings } from "./useKeyBindings";
 
 import {
@@ -116,12 +117,16 @@ async function withTimeout(promise: Promise<void>, ms: number): Promise<boolean>
  */
 async function syncFs(core: mGBAEmulator | undefined): Promise<string | null> {
   if (!core) return null;
-  try {
-    await core.FSSync();
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
+  // Pela fila de `durability`: sem sobrepor outra gravação, e o estado de
+  // persistência que a tela mostra fica sabendo do resultado.
+  await requestPersist(() => core.FSSync());
+  const d = getDurability();
+  return d.state === "saved" ? null : (d.error ?? "falha ao gravar");
+}
+
+/** Gravação automática: o resultado vai para o estado de persistência, não para quem chamou. */
+function persistir(core: mGBAEmulator | null | undefined): void {
+  if (core) void requestPersist(() => core.FSSync());
 }
 
 /**
@@ -516,8 +521,12 @@ export function useEmulator() {
   }, []);
 
   /** Espelho dos saves na pasta `saves/` do projeto (só em dev e preview). */
-  const { localSaves, refreshLocalSaves, backupToDisk, restoreFromDisk } =
+  const { localSaves, refreshLocalSaves, backupToDisk, flushDiskBackups, restoreFromDisk } =
     useDiskBackup(coreRef, setNotice, refreshLibrary);
+  const flushDiskRef = useRef(flushDiskBackups);
+  useEffect(() => {
+    flushDiskRef.current = flushDiskBackups;
+  }, [flushDiskBackups]);
 
   // O callback do core é registrado uma vez; a ref é o que deixa o backup
   // atual chegar até lá sem recriar aquele efeito.
@@ -592,7 +601,7 @@ export function useEmulator() {
         core.addCoreCallbacks({
           // O jogo gravou save: persiste no IndexedDB e espelha em disco.
           saveDataUpdatedCallback: () => {
-            core.FSSync().catch(() => undefined);
+            persistir(core);
             const rom = getLoadedRom();
             if (rom) void backupToDiskRef.current?.(rom);
             // O time so muda quando o jogo grava — e o core avisa exatamente
@@ -676,11 +685,10 @@ export function useEmulator() {
           setWasRunning(statusRef.current.kind === "running");
           core.pauseGame();
           core.pauseAudio();
-          // O try/catch em volta é síncrono e não pega rejeição de promise:
-          // sem este catch, sair da aba com a cota cheia virava rejeição não
-          // tratada no console. Aqui não há a quem avisar — a tela está indo
-          // embora —, então só não deixamos escapar.
-          core.FSSync().catch(() => undefined);
+          // Pela fila: sem rejeição solta no console, e o estado de
+          // persistência registra se deu certo para a próxima tela mostrar.
+          void flushDiskRef.current();
+          persistir(core);
         } catch {
           // sem jogo carregado: nada a pausar
         }
@@ -732,6 +740,8 @@ export function useEmulator() {
       // falhar e houver jogo em andamento.
       const anterior = statusRef.current;
       setNotice(null);
+      // O espelho em disco do jogo de antes, enquanto ele ainda está carregado.
+      await flushDiskRef.current();
       setStatus({ kind: "loading" });
 
       // O sistema de arquivos do core e plano. Se o nome carregar subpasta
@@ -1082,8 +1092,9 @@ export function useEmulator() {
   const stop = useCallback(() => {
     const core = coreRef.current;
     if (!core) return;
+    void flushDiskRef.current();
     core.quitGame();
-    core.FSSync().catch(() => undefined);
+    persistir(core);
     setLoadedRom(null);
     setRomId(null);
     // Fechar é dizer que não quer este jogo de volta na próxima visita — sem
@@ -1590,7 +1601,8 @@ export function useEmulator() {
   // Garante que o save vai para o IndexedDB se a aba for fechada no meio.
   useEffect(() => {
     const onHide = () => {
-      coreRef.current?.FSSync().catch(() => undefined);
+      void flushDiskRef.current();
+      persistir(coreRef.current);
     };
     window.addEventListener("pagehide", onHide);
     document.addEventListener("visibilitychange", onHide);
