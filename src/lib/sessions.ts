@@ -21,7 +21,7 @@ export const SAME_SESSION_MS = 5 * 60 * 1000;
 let sessions: Record<string, Session> = {};
 const listeners = new Set<() => void>();
 
-const isSession = (v: unknown): v is Session => {
+export const isSession = (v: unknown): v is Session => {
   if (!v || typeof v !== "object") return false;
   const s = v as Record<string, unknown>;
   return (

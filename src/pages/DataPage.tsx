@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  applyBackup,
+  BackupImportError,
   backupFileName,
   collectBackup,
-  parseBackup,
+  importBackup,
+  readBackup,
   summarize,
   type Backup,
   type BackupSummary,
@@ -76,30 +77,37 @@ const DataPage = () => {
     setErro(null);
     setVindo(null);
     if (!f) return;
-    let b: Backup | null;
-    try { b = parseBackup(await f.text()); } catch {
+    let r: ReturnType<typeof readBackup>;
+    try { r = readBackup(await f.text()); } catch {
       setErro(t("Não foi possível ler o arquivo. Escolha o backup novamente.", "Could not read the file. Select the backup again."));
       return;
     }
-    if (!b) {
-      setErro(t("Este arquivo não é um backup de aventuras do Pokemu.", "This file isn't a Pokemu adventure backup."));
+    if (!r.ok) {
+      setErro(
+        r.reason === "version"
+          ? t("Este backup é de uma versão mais nova do Pokemu. Nada foi alterado.", "This backup is from a newer version of Pokemu. Nothing was changed.")
+          : r.reason === "too-large"
+            ? t("Arquivo grande demais para ser um backup do Pokemu.", "File too large to be a Pokemu backup.")
+            : r.reason === "invalid"
+              ? t(
+                  `O backup tem registros que não conferem e não foi importado (nada foi alterado): ${r.problems.slice(0, 5).join("; ")}${r.problems.length > 5 ? "…" : ""}`,
+                  `The backup has records that don't check out and wasn't imported (nothing was changed): ${r.problems.slice(0, 5).join("; ")}${r.problems.length > 5 ? "…" : ""}`
+                )
+              : t("Este arquivo não é um backup de aventuras do Pokemu.", "This file isn't a Pokemu adventure backup.")
+      );
       return;
     }
-    setVindo({ nome: f.name, backup: b });
+    setVindo({ nome: f.name, backup: r.backup });
   };
 
   const importar = async () => {
     if (!s || !vindo) return;
-    try { applyBackup(s, vindo.backup); } catch (error) {
-      setErro(error instanceof Error && error.message === "Backup restore and rollback failed"
-        ? t("A restauração falhou e não foi possível repor todos os dados anteriores. Mantenha seus arquivos de backup e confira o armazenamento disponível.", "Restore failed and some previous data could not be recovered. Keep your backup files and check available storage.")
-        : t("Não foi possível restaurar o backup. Os dados anteriores foram mantidos; verifique o espaço disponível.", "Could not restore the backup. Previous data was retained; check available storage."));
-      return;
-    }
-    // Backup antigo não traz `guides`: o texto vem dentro da ficha e é levado
-    // para o banco no próximo carregamento.
-    try { await replaceAllGuideTexts(vindo.backup.guides ?? {}); } catch {
-      setErro(t("Os dados foram restaurados, mas o texto dos detonados não pôde ser gravado. Recarregue a página e cadastre os guias de novo.", "Data was restored, but walkthrough text could not be saved. Reload the page and add the guides again."));
+    try {
+      await importBackup(s, vindo.backup, { all: allGuideTexts, replaceAll: replaceAllGuideTexts });
+    } catch (error) {
+      setErro(error instanceof BackupImportError && error.reverted
+        ? t("Não foi possível restaurar o backup. Os dados anteriores foram mantidos, inclusive os detonados; verifique o espaço disponível.", "Could not restore the backup. Previous data was kept, walkthroughs included; check available storage.")
+        : t("A restauração falhou e não foi possível repor todos os dados anteriores. Mantenha seus arquivos de backup e confira o armazenamento disponível.", "Restore failed and some previous data could not be recovered. Keep your backup files and check available storage."));
       return;
     }
     // Os stores leem o localStorage ao carregar: recarregar é o jeito honesto

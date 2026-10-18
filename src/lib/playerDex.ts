@@ -24,7 +24,7 @@ const isNumeros = (v: unknown): v is number[] =>
   Array.isArray(v) &&
   v.every((n) => Number.isInteger(n) && n >= 1 && n <= TOTAL_DA_DEX_GEN3);
 
-function isEntry(v: unknown): v is PlayerDexEntry {
+export function isPlayerDexEntry(v: unknown): v is PlayerDexEntry {
   if (!v || typeof v !== "object") return false;
   const e = v as Record<string, unknown>;
   return (
@@ -53,7 +53,7 @@ function load(): Record<string, PlayerDexEntry> {
     if (!parsed || typeof parsed !== "object") return {};
     const out: Record<string, PlayerDexEntry> = {};
     for (const [rom, entry] of Object.entries(parsed)) {
-      if (isEntry(entry) && entry.rom === rom) out[rom] = entry;
+      if (isPlayerDexEntry(entry) && entry.rom === rom) out[rom] = entry;
     }
     return out;
   } catch {

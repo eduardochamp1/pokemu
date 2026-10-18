@@ -6,7 +6,12 @@
  * Fica de fora a última ROM aberta, que aponta para um arquivo que só existe
  * neste aparelho. Os saves do emulador também não vêm — vivem no IndexedDB e
  * já têm o backup em disco de `/jogar`.
+ *
+ * Migração: backup sem `guides` é anterior aos detonados no IndexedDB — o
+ * texto vem dentro da ficha, e o carregamento seguinte o leva para o banco.
+ * Versão diferente de 1 é recusada com motivo próprio, sem tentar adivinhar.
  */
+import { backupProblems } from "./backupSchema";
 
 export interface Backup {
   app: "pokedex";
@@ -54,14 +59,43 @@ export function collectBackup(s: StorageLike, now: Date = new Date()): Backup {
   return { app: "pokedex", version: 1, exportedAt: now.toISOString(), data };
 }
 
-/** `null` para qualquer coisa que não seja um backup deste site nesta versão. */
-export function parseBackup(text: string): Backup | null {
+/** Teto do arquivo: o `localStorage` inteiro cabe em ~5 MB, e os guias, à parte. */
+export const MAX_BACKUP_BYTES = 32 * 1024 * 1024;
+
+export type BackupRead =
+  | { ok: true; backup: Backup }
+  | { ok: false; reason: "format" | "version" | "too-large" }
+  | { ok: false; reason: "invalid"; problems: string[] };
+
+/**
+ * Lê e confere um backup inteiro antes de qualquer mudança: o envelope, e
+ * cada registro conhecido contra a forma que o store dele espera.
+ */
+export function readBackup(text: string): BackupRead {
+  if (text.length > MAX_BACKUP_BYTES) return { ok: false, reason: "too-large" };
   let v: unknown;
   try {
     v = JSON.parse(text);
   } catch {
-    return null;
+    return { ok: false, reason: "format" };
   }
+  const b = v as Record<string, unknown> | null;
+  if (b && typeof b === "object" && b.app === "pokedex" && typeof b.version === "number" && b.version !== 1) {
+    return { ok: false, reason: "version" };
+  }
+  const envelope = lerEnvelope(v);
+  if (!envelope) return { ok: false, reason: "format" };
+  const problems = backupProblems(envelope.data);
+  return problems.length > 0 ? { ok: false, reason: "invalid", problems } : { ok: true, backup: envelope };
+}
+
+/** `null` para qualquer coisa que não seja um backup deste site nesta versão, inteiro válido. */
+export function parseBackup(text: string): Backup | null {
+  const r = readBackup(text);
+  return r.ok ? r.backup : null;
+}
+
+function lerEnvelope(v: unknown): Backup | null {
   if (!v || typeof v !== "object") return null;
   const b = v as Record<string, unknown>;
   if (b.app !== "pokedex" || b.version !== 1 || typeof b.exportedAt !== "string") return null;
@@ -80,6 +114,56 @@ export function parseBackup(text: string): Backup | null {
     out.guides = b.guides as Record<string, string>;
   }
   return out;
+}
+
+/** A importação parou; `reverted` diz se os dados anteriores estão inteiros. */
+export class BackupImportError extends Error {
+  constructor(
+    readonly stage: "prepare" | "data" | "guides",
+    readonly reverted: boolean,
+    cause: unknown
+  ) {
+    super(`importação do backup falhou em ${stage}`, { cause });
+    this.name = "BackupImportError";
+  }
+}
+
+export interface GuideStoreLike {
+  all(): Promise<Record<string, string>>;
+  /** Uma transação só: ou troca tudo, ou nada. */
+  replaceAll(guides: Record<string, string>): Promise<void>;
+}
+
+/**
+ * Importa o backup como uma operação só: registros do `localStorage` e
+ * detonados do IndexedDB. Se os detonados não couberem, os registros voltam
+ * ao que eram — a pessoa não fica com metade de um backup apresentada como
+ * importada.
+ */
+export async function importBackup(s: StorageLike, b: Backup, guides: GuideStoreLike): Promise<void> {
+  let antes: Backup;
+  try {
+    antes = collectBackup(s);
+    await guides.all();
+  } catch (error) {
+    throw new BackupImportError("prepare", true, error);
+  }
+  try {
+    applyBackup(s, b);
+  } catch (error) {
+    const falhouVolta = error instanceof Error && error.message === "Backup restore and rollback failed";
+    throw new BackupImportError("data", !falhouVolta, error);
+  }
+  try {
+    await guides.replaceAll(b.guides ?? {});
+  } catch (error) {
+    try {
+      applyBackup(s, antes);
+    } catch {
+      throw new BackupImportError("guides", false, error);
+    }
+    throw new BackupImportError("guides", true, error);
+  }
 }
 
 /** Troca os dados do site pelos do backup. O que não é do site fica como está. */

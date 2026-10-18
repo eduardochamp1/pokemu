@@ -148,22 +148,57 @@ export function diffSnapshots(prev: Snapshot, next: Snapshot): TrainerEvent[] {
   return [...events, ...doTime];
 }
 
-function isEntry(v: unknown): v is TrainerEntry {
-  if (!v || typeof v !== "object") return false;
-  const e = v as Record<string, unknown>;
+const objeto = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const num = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const inteiros = (v: unknown, max = 2000) => Array.isArray(v) && v.length <= max && v.every((n) => Number.isInteger(n));
+const nuloOu = (v: unknown, ok: (x: unknown) => boolean) => v === undefined || v === null || ok(v);
+const isSnapshotMon = (v: unknown) =>
+  objeto(v) && num(v.national) && num(v.level) && typeof v.nickname === "string" && (v.shiny === undefined || typeof v.shiny === "boolean");
+
+/**
+ * Confere tudo o que as telas leem sem perguntar: o tempo de jogo, o time,
+ * o retrato anterior. Uma ficha que passa aqui não derruba a página ao ser
+ * desenhada — vinda do save ou de um backup.
+ */
+export function isTrainerEntry(v: unknown): v is TrainerEntry {
+  if (!objeto(v)) return false;
+  const e = v;
+  const t = e.trainer;
+  const last = e.last;
   return (
     typeof e.rom === "string" &&
-    typeof e.updatedAt === "number" &&
+    num(e.updatedAt) &&
     typeof e.playerName === "string" &&
-    !!e.trainer &&
-    typeof e.trainer === "object" &&
+    objeto(t) &&
+    num(t.trainerId) &&
+    num(t.secretId) &&
+    objeto(t.playTime) &&
+    num(t.playTime.hours) &&
+    num(t.playTime.minutes) &&
+    num(t.playTime.seconds) &&
+    nuloOu(t.money, num) &&
+    nuloOu(t.badges, (b) => Array.isArray(b) && b.every((x) => typeof x === "boolean")) &&
+    nuloOu(t.visitedTowns, (x) => inteiros(x, 64)) &&
     Array.isArray(e.party) &&
+    e.party.length <= 6 &&
+    e.party.every(isSnapshotMon) &&
+    (e.team === undefined || (Array.isArray(e.team) && e.team.length <= 6 && e.team.every(objeto))) &&
     Array.isArray(e.boxes) &&
-    Array.isArray(e.owned) &&
-    Array.isArray(e.seen) &&
-    !!e.last &&
-    typeof e.last === "object" &&
-    Array.isArray(e.events)
+    e.boxes.length <= 14 &&
+    inteiros(e.owned) &&
+    inteiros(e.seen) &&
+    objeto(last) &&
+    num(last.at) &&
+    num(last.playSeconds) &&
+    inteiros(last.owned) &&
+    num(last.seenCount) &&
+    Array.isArray(last.badges) &&
+    inteiros(last.towns, 64) &&
+    Array.isArray(last.party) &&
+    last.party.every(isSnapshotMon) &&
+    Array.isArray(e.events) &&
+    e.events.length <= MAX_EVENTS &&
+    e.events.every((ev) => objeto(ev) && typeof ev.kind === "string" && num(ev.at))
   );
 }
 
@@ -179,7 +214,7 @@ function load(): Record<string, TrainerEntry> {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return {};
     const out: Record<string, TrainerEntry> = {};
-    for (const [rom, e] of Object.entries(parsed)) if (isEntry(e) && e.rom === rom) out[rom] = e;
+    for (const [rom, e] of Object.entries(parsed)) if (isTrainerEntry(e) && e.rom === rom) out[rom] = e;
     return out;
   } catch {
     return {};

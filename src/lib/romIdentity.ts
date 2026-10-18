@@ -49,7 +49,7 @@ export async function sha256Hex(bytes: BufferSource): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function isIdentity(v: unknown): v is RomIdentity {
+export function isRomIdentity(v: unknown): v is RomIdentity {
   if (!v || typeof v !== "object") return false;
   const e = v as Record<string, unknown>;
   return (
@@ -72,7 +72,7 @@ export function loadRegistry(storage: StorageLike): RomRegistry {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
     const out: RomRegistry = {};
     for (const [rom, entry] of Object.entries(parsed)) {
-      if (isIdentity(entry)) out[rom] = entry;
+      if (isRomIdentity(entry)) out[rom] = entry;
     }
     return out;
   } catch {
