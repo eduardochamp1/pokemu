@@ -10,6 +10,7 @@ import {
   type MapMark,
 } from "./mapMarks";
 import { HOENN_TOWNS } from "../data/hoenn";
+import { StaleWriteError } from "./recordStore";
 
 const memory: Record<string, string> = {};
 beforeEach(() => {
@@ -39,10 +40,12 @@ describe("marcações", () => {
     expect(memory[MAP_MARKS_KEY]).toBeUndefined();
   });
 
-  it("marcação com forma errada é descartada ao carregar, as boas ficam", () => {
+  it("marcação com forma errada é descartada ao regravar a aventura dela; as outras ficam como estão", () => {
     memory[MAP_MARKS_KEY] = JSON.stringify({ "a.gba": { rom: "a.gba", marks: [marca("ok", 1), { id: 5 }] } });
     reloadMapMarks();
     setMapMarks("b.gba", []);
+    expect(JSON.parse(memory[MAP_MARKS_KEY])["a.gba"].marks).toHaveLength(2);
+    setMapMarks("a.gba", [marca("ok", 1)]);
     expect(JSON.parse(memory[MAP_MARKS_KEY])["a.gba"].marks).toHaveLength(1);
   });
 
@@ -77,5 +80,29 @@ describe("esquema de Hoenn", () => {
     const ligadas = new Set(HOENN_LINKS.flat());
     expect(ligadas.size).toBe(HOENN_TOWNS.length);
     for (const i of ligadas) expect(HOENN_LAYOUT[i]).toBeDefined();
+  });
+});
+
+describe("outra aba (PS-02)", () => {
+  it("gravação daqui não apaga a aventura que outra aba acrescentou", () => {
+    setMapMarks("a.gba", [marca("a", 1)]);
+    // Outra aba grava B depois da cópia em memória desta.
+    const remoto = JSON.parse(memory[MAP_MARKS_KEY]);
+    remoto["b.gba"] = { rom: "b.gba", marks: [marca("b", 2)] };
+    memory[MAP_MARKS_KEY] = JSON.stringify(remoto);
+    setMapMarks("a.gba", [marca("a", 1, true)]);
+    const gravado = JSON.parse(memory[MAP_MARKS_KEY]);
+    expect(gravado["b.gba"].marks.map((m: MapMark) => m.id)).toEqual(["b"]);
+    expect(gravado["a.gba"].marks[0].done).toBe(true);
+  });
+
+  it("mesma aventura mudada em outra aba: recusa, recarrega e não perde a edição de lá", () => {
+    setMapMarks("a.gba", [marca("a", 1)]);
+    memory[MAP_MARKS_KEY] = JSON.stringify({ "a.gba": { rom: "a.gba", marks: [marca("a", 1), marca("outra-aba", 2)] } });
+    expect(() => setMapMarks("a.gba", [])).toThrow(StaleWriteError);
+    expect(JSON.parse(memory[MAP_MARKS_KEY])["a.gba"].marks).toHaveLength(2);
+    // Já recarregada, a próxima tentativa parte do que a outra aba gravou.
+    setMapMarks("a.gba", [marca("a", 1)]);
+    expect(JSON.parse(memory[MAP_MARKS_KEY])["a.gba"].marks).toHaveLength(1);
   });
 });

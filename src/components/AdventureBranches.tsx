@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCore, getLoadedRom } from "../emulator/core";
-import { buildCapsule, planFor, restoreCapsule } from "../emulator/capsuleActions";
+import { buildCapsule, switchToBranch } from "../emulator/capsuleActions";
 import {
   MAX_BRANCHES_PER_ROM,
   branchSummary,
@@ -33,20 +33,29 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
   const en = lang === "en";
   const t = (pt: string, enText: string) => tr(lang, pt, enText);
   const [escolhida, setEscolhida] = useState("");
-  const [branches, setBranches] = useState<Branch[]>([]);
+  /** A lista e de qual aventura ela é: uma resposta atrasada de outra não aparece aqui. */
+  const [lista, setLista] = useState<{ rom: string | undefined; items: Branch[] }>({ rom: undefined, items: [] });
   const [nome, setNome] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [apagando, setApagando] = useState<string | null>(null);
   const rom = roms.includes(escolhida) ? escolhida : (currentRom ?? roms[0]);
 
+  const branches = lista.rom === rom ? lista.items.filter((b) => b.rom === rom) : [];
+
+  // Cada leitura leva um número; só a mais recente publica. Ler A devagar e B
+  // depressa não deixa A substituir a lista de B quando terminar.
+  const geracao = useRef(0);
   const recarregar = useCallback(async () => {
-    if (!rom) return setBranches([]);
+    const minha = ++geracao.current;
+    if (!rom) return setLista({ rom, items: [] });
+    let items: Branch[];
     try {
-      setBranches(await listBranches(rom));
+      items = await listBranches(rom);
     } catch {
-      setBranches([]);
+      items = [];
     }
+    if (minha === geracao.current) setLista({ rom, items });
   }, [rom]);
   useEffect(() => {
     void recarregar();
@@ -82,8 +91,10 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
   };
 
   const trocar = async (b: Branch) => {
-    if (!rom) return;
-    if (getLoadedRom() === rom) {
+    // O destino fica fixo desde o clique, e tem de ser a aventura da ramificação.
+    const destino = rom;
+    if (!destino || b.rom !== destino) return;
+    if (getLoadedRom() === destino) {
       setAviso(t("Feche este jogo antes de trocar de ramificação.", "Close this game before switching branches."));
       return;
     }
@@ -94,12 +105,12 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
       const core = await getCore();
       // Primeiro o que está em uso agora vira uma ramificação: só depois de
       // ela estar gravada é que qualquer arquivo é substituído.
-      const atual = await buildCapsule(core, rom);
+      const atual = await buildCapsule(core, destino);
       if (atual.files.length > 0) {
-        await saveBranch(newBranch(rom, t(`Antes de voltar a "${b.name}"`, `Before returning to "${b.name}"`), atual, true));
+        await saveBranch(newBranch(destino, t(`Antes de voltar a "${b.name}"`, `Before returning to "${b.name}"`), atual, true));
       }
       restaurando = true;
-      await restoreCapsule(core, b.capsule, rom, planFor(core, b.capsule, rom), true);
+      await switchToBranch(core, b, destino);
       onRestored();
       await recarregar();
       setAviso(t(`A aventura voltou para "${b.name}". O estado anterior ficou guardado na lista.`, `The adventure is back at "${b.name}". The previous state was kept in the list.`));
@@ -145,7 +156,7 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
       <div className="branch-new">
         <label>
           {t("Jogo", "Game")}
-          <select value={rom ?? ""} onChange={(e) => setEscolhida(e.target.value)}>
+          <select value={rom ?? ""} onChange={(e) => setEscolhida(e.target.value)} disabled={ocupado}>
             {roms.map((name) => <option key={name} value={name}>{adventureLabel(name)}</option>)}
           </select>
         </label>

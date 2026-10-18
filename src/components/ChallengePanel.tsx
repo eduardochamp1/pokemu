@@ -13,6 +13,7 @@ import {
 } from "../lib/challenge";
 import { useTrainerEntries } from "../lib/trainerLog";
 import { localeOf, tr, useLang } from "../i18n/lang";
+import { StaleWriteError } from "../lib/recordStore";
 import "../styles/journal.css";
 
 const novoId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -43,8 +44,12 @@ export default function ChallengePanel({ rom }: { rom: string }) {
     try {
       acao();
       setErro(null);
-    } catch {
-      setErro(t("Não foi possível guardar. Verifique o espaço do navegador.", "Couldn't save. Check browser storage."));
+    } catch (error) {
+      setErro(
+        error instanceof StaleWriteError
+          ? t("Este desafio mudou em outra aba. Ele foi atualizado aqui; confira e tente de novo.", "This challenge changed in another tab. It was refreshed here; check it and try again.")
+          : t("Não foi possível guardar. Verifique o espaço do navegador.", "Couldn't save. Check browser storage.")
+      );
     }
   };
   const mudar = (patch: Parameters<typeof updateChallenge>[1]) => salvar(() => updateChallenge(rom, patch));

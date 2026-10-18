@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { onOtherTab, StaleWriteError, writeRecordEntry } from "./recordStore";
 
 /**
  * Mapa de progresso: os lugares que a pessoa marca numa aventura.
@@ -45,14 +46,20 @@ let entries: Record<string, Entry> = {};
 const listeners = new Set<() => void>();
 const VAZIO: MapMark[] = [];
 
+/** A entrada como este store a lê: só as marcações válidas. */
+const entryDe = (rom: string) => (e: unknown): Entry | undefined => {
+  const marks = (e as { marks?: unknown } | null)?.marks;
+  return Array.isArray(marks) ? { rom, marks: marks.filter(isMark).slice(0, MAX_MARKS) } : undefined;
+};
+
 export function reloadMapMarks(): void {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(MAP_MARKS_KEY) ?? "{}");
     const out: Record<string, Entry> = {};
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       for (const [rom, e] of Object.entries(parsed)) {
-        const marks = (e as { marks?: unknown } | null)?.marks;
-        if (Array.isArray(marks)) out[rom] = { rom, marks: marks.filter(isMark).slice(0, MAX_MARKS) };
+        const entry = entryDe(rom)(e);
+        if (entry) out[rom] = entry;
       }
     }
     entries = out;
@@ -63,19 +70,33 @@ export function reloadMapMarks(): void {
 }
 reloadMapMarks();
 
-/** Grava e só então publica: falha de armazenamento não finge ter salvado. */
+/**
+ * Grava e só então publica: falha de armazenamento não finge ter salvado.
+ * Só a entrada desta ROM é trocada, relida na hora; se outra aba mudou estas
+ * mesmas marcações, sobe `StaleWriteError` e a lista é recarregada.
+ */
 export function setMapMarks(rom: string, marks: MapMark[]): void {
   if (marks.length > MAX_MARKS || !marks.every(isMark)) throw new Error("Invalid map marks");
-  const next = { ...entries, [rom]: { rom, marks } };
-  localStorage.setItem(MAP_MARKS_KEY, JSON.stringify(next));
-  entries = next;
-  listeners.forEach((l) => l());
+  try {
+    writeRecordEntry(MAP_MARKS_KEY, rom, entries[rom], { rom, marks }, entryDe(rom));
+  } catch (error) {
+    if (error instanceof StaleWriteError) reloadMapMarks();
+    throw error;
+  }
+  reloadMapMarks();
 }
 
+let pararDeOuvir: (() => void) | null = null;
+
 function subscribe(l: () => void) {
+  if (listeners.size === 0) pararDeOuvir = onOtherTab(MAP_MARKS_KEY, reloadMapMarks);
   listeners.add(l);
   return () => {
     listeners.delete(l);
+    if (listeners.size === 0) {
+      pararDeOuvir?.();
+      pararDeOuvir = null;
+    }
   };
 }
 

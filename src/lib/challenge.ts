@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { EMERALD_GYMS, FRLG_GYMS } from "../data/gymLeaders";
 import { nextGym } from "./gymGuide";
+import { onOtherTab, StaleWriteError, writeRecordEntry } from "./recordStore";
 
 /**
  * Modo desafio: regras que a pessoa impõe a si mesma (Nuzlocke e parentes).
@@ -85,6 +86,7 @@ export function isChallenge(v: unknown): v is Challenge {
 }
 
 let challenges: Record<string, Challenge> = {};
+const valido = (rom: string) => (c: unknown): Challenge | undefined => (isChallenge(c) && c.rom === rom ? c : undefined);
 const listeners = new Set<() => void>();
 
 export function reloadChallenges(): void {
@@ -92,7 +94,10 @@ export function reloadChallenges(): void {
     const parsed: unknown = JSON.parse(localStorage.getItem(CHALLENGE_KEY) ?? "{}");
     const out: Record<string, Challenge> = {};
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      for (const [rom, c] of Object.entries(parsed)) if (isChallenge(c) && c.rom === rom) out[rom] = c;
+      for (const [rom, c] of Object.entries(parsed)) {
+        const ok = valido(rom)(c);
+        if (ok) out[rom] = ok;
+      }
     }
     challenges = out;
   } catch {
@@ -102,16 +107,25 @@ export function reloadChallenges(): void {
 }
 reloadChallenges();
 
-/** Grava e só então publica: falha de armazenamento não finge ter salvado. */
-function persist(next: Record<string, Challenge>): void {
-  localStorage.setItem(CHALLENGE_KEY, JSON.stringify(next));
-  challenges = next;
-  listeners.forEach((l) => l());
+/**
+ * Grava e só então publica: falha de armazenamento não finge ter salvado.
+ * Troca só a entrada desta ROM, relida na hora: o que outra aba gravou em
+ * outra aventura fica. Se a outra aba mexeu neste mesmo desafio, sobe
+ * `StaleWriteError` e o desafio é recarregado.
+ */
+function persist(rom: string, next: Challenge | undefined): void {
+  try {
+    writeRecordEntry(CHALLENGE_KEY, rom, challenges[rom], next, valido(rom));
+  } catch (error) {
+    if (error instanceof StaleWriteError) reloadChallenges();
+    throw error;
+  }
+  reloadChallenges();
 }
 
 export function startChallenge(rom: string, now: number = Date.now()): void {
   if (challenges[rom]) return;
-  persist({ ...challenges, [rom]: { rom, startedAt: now, rules: ["first-encounter", "faint-is-loss"], custom: [], encounters: [], losses: [] } });
+  persist(rom, { rom, startedAt: now, rules: ["first-encounter", "faint-is-loss"], custom: [], encounters: [], losses: [] });
 }
 
 export function updateChallenge(rom: string, patch: Partial<Omit<Challenge, "rom" | "startedAt">>): void {
@@ -119,19 +133,24 @@ export function updateChallenge(rom: string, patch: Partial<Omit<Challenge, "rom
   if (!atual) throw new Error("No challenge for this game");
   const next = { ...atual, ...patch };
   if (!isChallenge(next)) throw new Error("Invalid challenge data");
-  persist({ ...challenges, [rom]: next });
+  persist(rom, next);
 }
 
 export function endChallenge(rom: string): void {
-  const { [rom]: _fora, ...resto } = challenges;
-  void _fora;
-  persist(resto);
+  persist(rom, undefined);
 }
 
+let pararDeOuvir: (() => void) | null = null;
+
 function subscribe(l: () => void) {
+  if (listeners.size === 0) pararDeOuvir = onOtherTab(CHALLENGE_KEY, reloadChallenges);
   listeners.add(l);
   return () => {
     listeners.delete(l);
+    if (listeners.size === 0) {
+      pararDeOuvir?.();
+      pararDeOuvir = null;
+    }
   };
 }
 

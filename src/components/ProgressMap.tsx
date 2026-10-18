@@ -9,6 +9,7 @@ import {
   useMapMarks,
 } from "../lib/mapMarks";
 import { tr, useLang } from "../i18n/lang";
+import { StaleWriteError } from "../lib/recordStore";
 import "../styles/progressMap.css";
 
 interface Props {
@@ -35,8 +36,12 @@ export default function ProgressMap({ rom, visitedTowns }: Props) {
     try {
       setMapMarks(rom, next);
       setErro(null);
-    } catch {
-      setErro(t("Não foi possível guardar a marcação.", "Couldn't save the mark."));
+    } catch (error) {
+      setErro(
+        error instanceof StaleWriteError
+          ? t("Estas marcações mudaram em outra aba. A lista foi atualizada; confira e tente de novo.", "These marks changed in another tab. The list was refreshed; check it and try again.")
+          : t("Não foi possível guardar a marcação.", "Couldn't save the mark.")
+      );
     }
   };
 

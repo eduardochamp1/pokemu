@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildCapsule, restoreCapsule, RestoreError } from "./capsuleActions";
+import { buildCapsule, restoreCapsule, RestoreError, switchToBranch } from "./capsuleActions";
 import type { mGBAEmulator } from "./types";
 import { capsuleFile, CapsuleIncompleteError, planRestore, type Capsule } from "../lib/capsule";
 import * as guideStore from "../lib/guideStore";
@@ -113,5 +113,21 @@ describe("restoreCapsule diz se desfez (mensagem de AUD-01)", () => {
     });
     const erro = await restoreCapsule(core, c, "demo.gba", planRestore(c, new Set([".sav"]), "mGBA 1")).catch((e: unknown) => e);
     expect(erro).toMatchObject({ stage: "data", reverted: false });
+  });
+});
+
+describe("switchToBranch (PS-09)", () => {
+  it("recusa ramificação de outra aventura antes de tocar em qualquer arquivo", async () => {
+    const { core, files } = fakeCore();
+    const c = capsula([await capsuleFile("save", ".sav", new Uint8Array([9]))]);
+    await expect(switchToBranch(core, { rom: "outra.gba", capsule: c }, "demo.gba")).rejects.toThrow("ramificação de outra.gba");
+    expect([...files.get("/saves/demo.sav")!]).toEqual([1]);
+  });
+
+  it("da mesma aventura, restaura", async () => {
+    const { core, files } = fakeCore();
+    const c = capsula([await capsuleFile("save", ".sav", new Uint8Array([9]))]);
+    await switchToBranch(core, { rom: "demo.gba", capsule: c }, "demo.gba");
+    expect([...files.get("/saves/demo.sav")!]).toEqual([9]);
   });
 });

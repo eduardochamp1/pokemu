@@ -12,6 +12,7 @@ import {
   type Challenge,
 } from "./challenge";
 import { EMERALD_GYMS } from "../data/gymLeaders";
+import { StaleWriteError } from "./recordStore";
 
 const memory: Record<string, string> = {};
 beforeEach(() => {
@@ -65,7 +66,7 @@ describe("desafio por jogo", () => {
   it("falha de armazenamento sobe em vez de fingir que salvou", () => {
     startChallenge("Emerald.gba", 1);
     vi.stubGlobal("localStorage", {
-      getItem: () => null,
+      getItem: (k: string) => memory[k] ?? null,
       setItem: () => {
         throw new Error("cota");
       },
@@ -73,14 +74,15 @@ describe("desafio por jogo", () => {
     expect(() => updateChallenge("Emerald.gba", { custom: ["Sem lendários"] })).toThrow("cota");
   });
 
-  it("entrada com forma errada é descartada ao carregar", () => {
+  it("entrada com forma errada não é carregada, mas também não é apagada ao gravar outra", () => {
     memory[CHALLENGE_KEY] = JSON.stringify({
       "ok.gba": { rom: "ok.gba", startedAt: 1, rules: [], custom: [], encounters: [], losses: [] },
       "ruim.gba": { rom: "outro.gba", startedAt: 1, rules: [], custom: [], encounters: [], losses: [] },
     });
     reloadChallenges();
     startChallenge("novo.gba", 2);
-    expect(Object.keys(gravado()).sort()).toEqual(["novo.gba", "ok.gba"]);
+    expect(Object.keys(gravado()).sort()).toEqual(["novo.gba", "ok.gba", "ruim.gba"]);
+    expect(isChallenge(gravado()["ruim.gba"]) && gravado()["ruim.gba"].rom === "ruim.gba").toBe(false);
   });
 });
 
@@ -127,5 +129,27 @@ describe("areaUsed", () => {
   it("compara sem caixa, acento nem espaço nas pontas", () => {
     expect(areaUsed(e, " rota 101 ")).toBe(true);
     expect(areaUsed(e, "Rota 102")).toBe(false);
+  });
+});
+
+describe("outra aba (PS-02)", () => {
+  it("desafio desta aventura não apaga o que outra aba gravou em outra", () => {
+    startChallenge("a.gba", 1);
+    const remoto = gravado();
+    remoto["b.gba"] = { ...remoto["a.gba"], rom: "b.gba" };
+    memory[CHALLENGE_KEY] = JSON.stringify(remoto);
+    updateChallenge("a.gba", { custom: ["sem cura"] });
+    endChallenge("a.gba");
+    expect(Object.keys(gravado())).toEqual(["b.gba"]);
+  });
+
+  it("mesmo desafio mudado em outra aba: recusa em vez de sobrescrever", () => {
+    startChallenge("a.gba", 1);
+    const remoto = gravado();
+    remoto["a.gba"] = { ...remoto["a.gba"], custom: ["da outra aba"] };
+    memory[CHALLENGE_KEY] = JSON.stringify(remoto);
+    expect(() => updateChallenge("a.gba", { custom: ["daqui"] })).toThrow(StaleWriteError);
+    expect(gravado()["a.gba"].custom).toEqual(["da outra aba"]);
+    expect(() => endChallenge("a.gba")).not.toThrow();
   });
 });

@@ -69,6 +69,20 @@ export function planFor(core: mGBAEmulator, capsule: Capsule, target: string): R
   return planRestore(capsule, existingSuffixes(fsDe(core), core.filePaths(), target), coreVersion(core));
 }
 
+/**
+ * Volta a aventura `target` para uma ramificação. Recusa ramificação de outra
+ * aventura antes de tocar em qualquer coisa: uma lista desatualizada na tela
+ * não pode virar a restauração de um snapshot alheio.
+ */
+export async function switchToBranch(
+  core: mGBAEmulator,
+  branch: { rom: string; capsule: Capsule },
+  target: string
+): Promise<void> {
+  if (branch.rom !== target) throw new Error(`ramificação de ${branch.rom}, não de ${target}`);
+  await restoreCapsule(core, branch.capsule, target, planFor(core, branch.capsule, target), true);
+}
+
 /** Em que etapa a restauração parou, e se o que mudou foi desfeito. */
 export class RestoreError extends Error {
   constructor(
