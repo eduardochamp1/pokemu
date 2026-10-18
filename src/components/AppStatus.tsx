@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useT } from "../i18n/lang";
+import { idbIsDurable } from "../lib/idb";
 
 function subscribeOnline(cb: () => void) {
   window.addEventListener("online", cb);
@@ -27,6 +28,24 @@ export const OfflineBanner = () => {
       {t(
         "Sem conexão — o que você já abriu continua funcionando. O que for novo da PokéAPI espera a rede voltar.",
         "Offline — what you already opened keeps working. Anything new from the PokéAPI waits for the network."
+      )}
+    </div>
+  );
+};
+
+/**
+ * Sem IndexedDB (modo privado restrito, banco bloqueado pelo navegador), os
+ * detonados e as ramificações ficam só na memória da aba. A tela diz isso
+ * uma vez, no topo, em vez de deixar a pessoa descobrir ao recarregar.
+ */
+export const TemporaryStorageBanner = () => {
+  const t = useT();
+  if (idbIsDurable()) return null;
+  return (
+    <div className="offline-banner" role="status">
+      {t(
+        "Armazenamento temporário: este navegador não deixa o site guardar detonados e ramificações. Eles valem só até fechar a aba — exporte o que quiser manter.",
+        "Temporary storage: this browser doesn't let the site keep walkthroughs and branches. They last only until the tab closes — export what you want to keep."
       )}
     </div>
   );

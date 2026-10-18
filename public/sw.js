@@ -48,11 +48,30 @@ self.addEventListener("install", (event) => {
       // Um por um e sem abortar: um arquivo que falhe não pode impedir o
       // worker de instalar — ele só fica de fora do offline.
       await Promise.allSettled(PRECACHE.map((url) => cache.add(url)));
+      // Menos o shell: sem ele a versão nova não abre offline. Instalar assim
+      // e ativar apagaria o build anterior, o único que ainda abre — então a
+      // instalação falha e o worker de antes continua até a próxima tentativa.
+      if (!(await temShell(cache))) throw new Error("shell fora do pré-cache");
       // Assumir o controle já na primeira visita, sem esperar a aba fechar.
       await self.skipWaiting();
     })()
   );
 });
+
+/** O build tem o HTML que abre o app? Sem pré-cache (dev) não há o que exigir. */
+const SHELLS = PRECACHE.filter((url) => url === SHELL_URL || url === "/");
+
+async function temShell(cache) {
+  if (SHELLS.length === 0) return true;
+  for (const url of SHELLS) if (await cache.match(url, { ignoreVary: true })) return true;
+  return false;
+}
+
+/** Sem abrir (e criar) o cache à toa quando não há o que conferir. */
+async function buildUtilizavel() {
+  if (SHELLS.length === 0) return true;
+  return (await caches.has(BUILD)) && temShell(await caches.open(BUILD));
+}
 
 /**
  * Copia um cache de nome antigo para o novo. O que já existe no novo fica: é
@@ -82,12 +101,15 @@ self.addEventListener("activate", (event) => {
         }
       }
       // Builds anteriores (com qualquer um dos dois prefixos) e os caches de
-      // nome antigo, que a esta altura já foram copiados.
-      await Promise.all(
-        names
-          .filter((name) => (name.startsWith("pokemu-") || name.startsWith("pokedex-")) && !NOSSOS.includes(name))
-          .map((name) => caches.delete(name))
-      );
+      // nome antigo, que a esta altura já foram copiados. Só com o build novo
+      // utilizável: sem o shell dele, o anterior é o que abre o app offline.
+      if (await buildUtilizavel()) {
+        await Promise.all(
+          names
+            .filter((name) => (name.startsWith("pokemu-") || name.startsWith("pokedex-")) && !NOSSOS.includes(name))
+            .map((name) => caches.delete(name))
+        );
+      }
       await self.clients.claim();
     })()
   );
@@ -96,12 +118,20 @@ self.addEventListener("activate", (event) => {
 /**
  * Guarda a resposta e devolve ela. Só 200 não opaco entra no cache: resposta
  * de erro cacheada vira um erro permanente que ninguém entende depois.
+ *
+ * Entregar e guardar são coisas separadas: com o cache cheio (`put` rejeita
+ * por cota), a resposta que veio da rede é entregue do mesmo jeito. Antes a
+ * falha de gravar virava "sem rede e sem cache" com a resposta 200 na mão.
  */
 async function guardar(cacheName, request, response) {
   if (response && response.ok && response.type !== "opaque") {
-    const cache = await caches.open(cacheName);
-    await cache.put(request, response.clone());
-    if (cacheName === API) await aparar(cache);
+    try {
+      const cache = await caches.open(cacheName);
+      await cache.put(request, response.clone());
+      if (cacheName === API) await aparar(cache);
+    } catch {
+      // não coube no cache: fica sem offline para este item, e só
+    }
   }
   return response;
 }
@@ -163,10 +193,13 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => guardar(BUILD, SHELL_URL, response))
         .catch(async () => {
+          // O shell deste build; sem ele, o de qualquer build ainda guardado.
           const cache = await caches.open(BUILD);
           return (
             (await cache.match(SHELL_URL, { ignoreVary: true })) ??
             (await cache.match("/", { ignoreVary: true })) ??
+            (await caches.match(SHELL_URL, { ignoreVary: true })) ??
+            (await caches.match("/", { ignoreVary: true })) ??
             Response.error()
           );
         })

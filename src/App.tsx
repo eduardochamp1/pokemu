@@ -2,7 +2,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import "./App.css";
 import Navbar from "./components/Navbar";
-import { OfflineBanner } from "./components/AppStatus";
+import { OfflineBanner, TemporaryStorageBanner } from "./components/AppStatus";
 import { useT } from "./i18n/lang";
 import { RouteFallback } from "./components/Skeleton";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -39,6 +39,7 @@ function App() {
       </a>
       <Navbar />
       <OfflineBanner />
+      <TemporaryStorageBanner />
       {/* O único <main> do site: é o landmark que leitor de tela procura, e
           o destino do link acima (tabIndex -1 para ele poder receber o foco). */}
       <main id="conteudo" tabIndex={-1}>

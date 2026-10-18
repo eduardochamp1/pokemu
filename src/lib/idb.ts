@@ -23,14 +23,41 @@ export function idbIsDurable(): boolean {
   return temIdb();
 }
 
+/** Quanto esperar quando outra aba segura a versão anterior do banco aberta. */
+export const IDB_BLOCKED_TIMEOUT_MS = 5000;
+
+/** Outra aba, com a versão anterior do site, segura o banco: a atualização espera ela fechar. */
+export class IdbBlockedError extends Error {
+  constructor() {
+    super("banco de dados bloqueado por outra aba do Pokemu");
+    this.name = "IdbBlockedError";
+  }
+}
+
 function abrir(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
+    let espera: ReturnType<typeof setTimeout> | undefined;
     req.onupgradeneeded = () => {
       for (const s of STORES) if (!req.result.objectStoreNames.contains(s)) req.result.createObjectStore(s);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      clearTimeout(espera);
+      const db = req.result;
+      // Uma aba com a versão nova pediu para atualizar: esta solta o banco
+      // em vez de travar a outra.
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    req.onerror = () => {
+      clearTimeout(espera);
+      reject(req.error);
+    };
+    // Sem isto, a promessa ficaria pendurada até a outra aba fechar, e a tela
+    // em "carregando" para sempre. Com o erro, quem chama avisa.
+    req.onblocked = () => {
+      espera = setTimeout(() => reject(new IdbBlockedError()), IDB_BLOCKED_TIMEOUT_MS);
+    };
   });
 }
 

@@ -96,3 +96,122 @@ describe("service worker: ativação", () => {
     expect(sw.estado()).toEqual({});
   });
 });
+
+/**
+ * Um escopo mais completo, com \`fetch\`, \`install\` e pré-cache: para os
+ * casos de cache cheio e atualização parcial (AUD-12).
+ */
+function escopo(opts: {
+  inicial?: Record<string, Record<string, string>>;
+  precache?: string[];
+  /** URLs que a rede não entrega na instalação. */
+  semRede?: string[];
+  /** \`put\` rejeita, como com a cota cheia. */
+  cacheCheio?: boolean;
+  rede?: (url: string) => Promise<{ ok: boolean; status: number; type: string; body: string; clone(): unknown }>;
+}) {
+  const store = new Map<string, Entradas>(
+    Object.entries(opts.inicial ?? {}).map(([nome, entradas]) => [nome, new Map(Object.entries(entradas))])
+  );
+  const chave = (r: unknown) => (typeof r === "string" ? r : (r as { url: string }).url).replace("https://pokemu.test", "");
+  const resposta = (body: string) => ({ ok: true, status: 200, type: "basic", body, clone() { return this; } });
+  const cache = (entradas: Entradas) => ({
+    keys: async () => [...entradas.keys()].map((url) => ({ url })),
+    match: async (r: unknown) => (entradas.has(chave(r)) ? resposta(entradas.get(chave(r))!) : undefined),
+    put: async (r: unknown, resp: { body: string }) => {
+      if (opts.cacheCheio) throw new DOMException("cota", "QuotaExceededError");
+      entradas.set(chave(r), resp.body);
+    },
+    add: async (url: string) => {
+      if (opts.semRede?.includes(url)) throw new TypeError("falha de rede");
+      entradas.set(url, `conteúdo de ${url}`);
+    },
+    delete: async (r: unknown) => entradas.delete(chave(r)),
+  });
+  const caches = {
+    keys: async () => [...store.keys()],
+    has: async (nome: string) => store.has(nome),
+    open: async (nome: string) => {
+      if (!store.has(nome)) store.set(nome, new Map());
+      return cache(store.get(nome)!);
+    },
+    delete: async (nome: string) => store.delete(nome),
+    match: async (r: unknown) => {
+      for (const e of store.values()) if (e.has(chave(r))) return resposta(e.get(chave(r))!);
+      return undefined;
+    },
+  };
+  type Evento = { waitUntil(p: Promise<unknown>): void; respondWith?(p: Promise<unknown>): void; request?: unknown };
+  const handlers: Record<string, (e: Evento) => void> = {};
+  const self = {
+    addEventListener: (tipo: string, fn: (e: Evento) => void) => void (handlers[tipo] = fn),
+    clients: { claim: async () => undefined },
+    skipWaiting: async () => undefined,
+    location: { origin: "https://pokemu.test" },
+  };
+  const fetch = (r: unknown) => (opts.rede ?? (async (u: string) => resposta(`rede ${u}`)))(chave(r));
+  const fonte = readFileSync(resolve(process.cwd(), "public/sw.js"), "utf8")
+    .replace('"__SW_VERSION__"', '"novo"')
+    .replace("/*__SW_PRECACHE__*/ []", JSON.stringify(opts.precache ?? []));
+  new Function("self", "caches", "fetch", "Response", fonte)(self, caches, fetch, { error: () => ({ ok: false, status: 0, body: "erro" }) });
+
+  const disparar = async (tipo: string, extra: Partial<Evento> = {}) => {
+    let espera: Promise<unknown> = Promise.resolve();
+    let resposta: Promise<unknown> | undefined;
+    handlers[tipo]({ waitUntil: (p) => void (espera = p), respondWith: (p) => void (resposta = p), ...extra });
+    await espera;
+    return resposta;
+  };
+  const pedir = (url: string, mode = "cors") =>
+    disparar("fetch", { request: { url: `https://pokemu.test${url}`, method: "GET", mode } }) as Promise<{ status: number; body: string }>;
+  const estado = () => Object.fromEntries([...store].sort().map(([nome, e]) => [nome, Object.fromEntries(e)]));
+  return { disparar, pedir, estado };
+}
+
+describe("service worker: cache cheio e atualização parcial (AUD-12)", () => {
+  it("rede 200 com o cache cheio entrega a resposta", async () => {
+    const sw = escopo({ cacheCheio: true });
+    const r = await sw.pedir("/sprites/pokemon/25.png");
+    expect(r.status).toBe(200);
+    expect(r.body).toBe("rede /sprites/pokemon/25.png");
+  });
+
+  it("sem rede, usa o que está no cache", async () => {
+    const sw = escopo({
+      inicial: { "pokemu-runtime-v1": { "/sprites/pokemon/25.png": "pikachu" } },
+      rede: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    expect((await sw.pedir("/sprites/pokemon/25.png")).body).toBe("pikachu");
+  });
+
+  it("instalação sem o shell falha, e o build anterior continua", async () => {
+    const sw = escopo({
+      inicial: { "pokemu-build-velho": { "/index.html": "shell velho" } },
+      precache: ["/index.html", "/assets/a.js"],
+      semRede: ["/index.html"],
+    });
+    await expect(sw.disparar("install")).rejects.toThrow("shell");
+    await sw.disparar("activate");
+    expect(sw.estado()["pokemu-build-velho"]).toEqual({ "/index.html": "shell velho" });
+  });
+
+  it("navegação offline acha o shell de um build anterior quando o atual não tem", async () => {
+    const sw = escopo({
+      inicial: { "pokemu-build-velho": { "/index.html": "shell velho" } },
+      precache: ["/index.html"],
+      rede: async () => {
+        throw new TypeError("offline");
+      },
+    });
+    expect((await sw.pedir("/treinador", "navigate")).body).toBe("shell velho");
+  });
+
+  it("atualização completa troca o build e apaga o anterior", async () => {
+    const sw = escopo({ inicial: { "pokemu-build-velho": { "/index.html": "velho" } }, precache: ["/index.html"] });
+    await sw.disparar("install");
+    await sw.disparar("activate");
+    expect(Object.keys(sw.estado())).toEqual(["pokemu-build-novo"]);
+  });
+});

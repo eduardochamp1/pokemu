@@ -83,8 +83,23 @@ export function displayName(apiName: string): string {
  * — rede fora, 5xx, JSON invalido — propaga, para que a UI possa distinguir
  * "nao existe" de "nao deu para consultar".
  */
+/** Quanto esperar a PokéAPI antes de desistir: rede lenta não pode deixar a tela carregando para sempre. */
+export const FETCH_TIMEOUT_MS = 15_000;
+
+/** Junta o sinal de quem chamou com o tempo-limite. */
+function comTempoLimite(signal: AbortSignal | undefined, ms: number): AbortSignal {
+  const limite = AbortSignal.timeout(ms);
+  if (!signal) return limite;
+  if (typeof AbortSignal.any === "function") return AbortSignal.any([signal, limite]);
+  const ctl = new AbortController();
+  const abortar = (s: AbortSignal) => () => ctl.abort(s.reason);
+  signal.addEventListener("abort", abortar(signal), { once: true });
+  limite.addEventListener("abort", abortar(limite), { once: true });
+  return ctl.signal;
+}
+
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
-  const response = await fetch(url, { signal });
+  const response = await fetch(url, { signal: comTempoLimite(signal, FETCH_TIMEOUT_MS) });
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Request failed: ${response.status} ${response.statusText}`);
