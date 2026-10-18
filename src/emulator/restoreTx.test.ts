@@ -196,17 +196,29 @@ describe("falha em cada fronteira desfaz tudo (AUD-01)", () => {
 });
 
 describe("queda no meio e reabertura (E02d)", () => {
-  /** Faz a operação parar para sempre num ponto, como uma aba fechada. */
-  const pontos: [string, (f: ReturnType<typeof fakeCore>) => void, "reverted" | "completed"][] = [
-    ["depois dos arquivos e registros", () => vi.spyOn(guideStore, "deleteGuideText").mockReturnValue(new Promise(() => {})), "reverted"],
-    ["durante a sincronização", (f) => (f.core.FSSync = vi.fn(() => new Promise(() => {}))), "reverted"],
+  /**
+   * Faz a operação parar para sempre num ponto, como uma aba fechada. Chama
+   * `chegou` quando a operação alcança o ponto: o teste espera por isso, e
+   * não por um tempo fixo, que sob carga podia não bastar.
+   */
+  const nunca = (chegou: () => void) => {
+    chegou();
+    return new Promise<never>(() => {});
+  };
+  const pontos: [string, (f: ReturnType<typeof fakeCore>, chegou: () => void) => void, "reverted" | "completed"][] = [
+    [
+      "depois dos arquivos e registros",
+      (_f, chegou) => vi.spyOn(guideStore, "deleteGuideText").mockImplementation(() => nunca(chegou)),
+      "reverted",
+    ],
+    ["durante a sincronização", (f, chegou) => (f.core.FSSync = vi.fn(() => nunca(chegou))), "reverted"],
     [
       "depois de confirmar, antes de limpar as reservas",
-      (f) => {
+      (f, chegou) => {
         const sync = f.core.FSSync;
         let n = 0;
         f.core.FSSync = vi.fn(async () => {
-          if (++n === 2) return new Promise(() => {});
+          if (++n === 2) return nunca(chegou);
           await sync();
         });
       },
@@ -216,9 +228,11 @@ describe("queda no meio e reabertura (E02d)", () => {
   for (const [nome, parar, esperado] of pontos) {
     it(`queda ${nome}: ao reabrir, ${esperado === "reverted" ? "desfaz" : "conclui"}`, async () => {
       const f = fakeCore(ANTES_FS);
-      parar(f);
+      let chegou!: () => void;
+      const ponto = new Promise<void>((r) => (chegou = r));
+      parar(f, chegou);
       void restaurar(f, "replace");
-      await new Promise((r) => setTimeout(r, 20));
+      await ponto;
       vi.restoreAllMocks();
       // Reabrir: o FS volta ao que estava no disco; localStorage e IDB ficam.
       resetRestoreLockForTests();

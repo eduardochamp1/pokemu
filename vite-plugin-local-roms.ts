@@ -1,13 +1,15 @@
 import {
+  lstat,
   mkdir,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
-  stat,
   writeFile,
 } from "node:fs/promises";
-import { extname, join, relative, resolve, sep } from "node:path";
+import { randomUUID } from "node:crypto";
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Connect, Plugin, ViteDevServer, PreviewServer } from "vite";
 
 /**
@@ -46,17 +48,40 @@ interface Entry {
   modified?: number;
 }
 
+function inside(root: string, target: string): boolean {
+  const rel = relative(root, target);
+  return !!rel && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
 /**
  * Resolve um caminho pedido pela URL dentro de `base`, recusando qualquer coisa
- * que escape (`../`, caminho absoluto, link para fora).
+ * que escape: `../`, caminho absoluto e link ou junction para fora. A mesma
+ * política do servidor do aplicativo desktop (`desktop/files.mjs`): primeiro o
+ * caminho como texto, depois o caminho real no disco, que é o que um link
+ * muda. Para gravar um arquivo que ainda não existe, o que se confere é a
+ * pasta real onde ele vai cair — e só um nome, sem subpasta.
  */
-function safeResolve(base: string, requested: string): string | null {
+export async function safeResolve(base: string, requested: string, writing = false): Promise<string | null> {
   const clean = requested.replace(/\\/g, "/").replace(/^\/+/, "");
-  if (!clean || clean.split("/").some((part) => part === "..")) return null;
+  if (!clean || clean.includes("\0") || clean.split("/").some((part) => part === ".." || part === "." || !part)) return null;
   const target = resolve(base, clean);
-  const rel = relative(base, target);
-  if (!rel || rel.startsWith("..") || rel.startsWith(sep)) return null;
-  return target;
+  if (!inside(resolve(base), target)) return null;
+  let raiz: string;
+  try {
+    raiz = await realpath(base);
+  } catch {
+    return null;
+  }
+  try {
+    return inside(raiz, await realpath(target)) ? target : null;
+  } catch {
+    if (!writing || clean.includes("/")) return null;
+    try {
+      return (await realpath(dirname(target))) === raiz ? target : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 /** Varre um diretorio recursivamente, devolvendo caminhos relativos. */
@@ -80,10 +105,13 @@ async function walk(
     const full = join(dir, name);
     let info;
     try {
-      info = await stat(full);
+      // lstat, não stat: link e junction aparecem como o que são, e ficam de
+      // fora — seguir um deles listaria arquivo de fora da pasta.
+      info = await lstat(full);
     } catch {
       continue; // sumiu entre readdir e stat
     }
+    if (info.isSymbolicLink()) continue;
     if (info.isDirectory()) {
       out.push(...(await walk(full, accept, `${prefix}${name}/`, depth + 1)));
     } else if (info.isFile() && accept(name)) {
@@ -130,7 +158,7 @@ function readBody(
   });
 }
 
-function middleware(root: string): Connect.NextHandleFunction {
+export function middleware(root: string): Connect.NextHandleFunction {
   const romsDir = resolve(root, ROMS_DIR);
   const savesDir = resolve(root, SAVES_DIR);
 
@@ -166,81 +194,80 @@ function middleware(root: string): Connect.NextHandleFunction {
 
     // ---- ROMs (somente leitura) ----
     if (path.startsWith("/local-roms/")) {
-      const target = safeResolve(
-        romsDir,
-        decodeURIComponent(path.slice("/local-roms/".length))
-      );
-      if (!target || !ROM_EXT.has(extname(target).toLowerCase())) {
-        notFound(res);
-        return;
-      }
-      readFile(target).then(
-        (buffer) => {
+      void (async () => {
+        const target = await safeResolve(romsDir, decodeURIComponent(path.slice("/local-roms/".length)));
+        if (!target || !ROM_EXT.has(extname(target).toLowerCase())) {
+          notFound(res);
+          return;
+        }
+        try {
+          const buffer = await readFile(target);
           res.setHeader("Content-Type", "application/octet-stream");
           res.setHeader("Content-Length", String(buffer.length));
           res.setHeader("Cache-Control", "no-store");
           res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
           res.end(buffer);
-        },
-        () => notFound(res)
-      );
+        } catch {
+          notFound(res);
+        }
+      })();
       return;
     }
 
     // ---- saves (leitura e escrita) ----
     if (path.startsWith("/local-saves/")) {
-      const name = decodeURIComponent(path.slice("/local-saves/".length));
-      const target = safeResolve(savesDir, name);
-      if (!target || !SAVE_EXT.test(target)) {
-        notFound(res);
-        return;
-      }
+      void (async () => {
+        const name = decodeURIComponent(path.slice("/local-saves/".length));
+        if (method === "PUT") await mkdir(savesDir, { recursive: true }).catch(() => undefined);
+        const target = await safeResolve(savesDir, name, method === "PUT");
+        if (!target || !SAVE_EXT.test(target)) {
+          notFound(res);
+          return;
+        }
 
-      if (method === "GET") {
-        readFile(target).then(
-          (buffer) => {
+        if (method === "GET") {
+          try {
+            const buffer = await readFile(target);
             res.setHeader("Content-Type", "application/octet-stream");
             res.setHeader("Content-Length", String(buffer.length));
             res.setHeader("Cache-Control", "no-store");
             res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
             res.end(buffer);
-          },
-          () => notFound(res)
-        );
-        return;
-      }
+          } catch {
+            notFound(res);
+          }
+          return;
+        }
 
-      if (method === "PUT") {
-        readBody(req, MAX_SAVE_BYTES).then(async (body) => {
+        if (method === "PUT") {
+          const body = await readBody(req, MAX_SAVE_BYTES);
           if (!body) {
             res.statusCode = 413;
             res.end("Save grande demais");
             return;
           }
+          // Temporario + rename: se o processo cair no meio da gravacao,
+          // o save anterior continua inteiro em vez de ficar truncado.
+          // O sufixo .tmp nao casa com SAVE_EXT, entao nao aparece na lista.
+          // Nome unico e criacao exclusiva ("wx"): duas gravacoes ao mesmo
+          // tempo nao dividem o temporario, e um link plantado com o nome
+          // dele nao e seguido.
+          const temp = `${target}.${randomUUID()}.tmp`;
           try {
-            await mkdir(savesDir, { recursive: true });
-            // Temporario + rename: se o processo cair no meio da gravacao,
-            // o save anterior continua inteiro em vez de ficar truncado.
-            // O sufixo .tmp nao casa com SAVE_EXT, entao nao aparece na lista.
-            const temp = `${target}.tmp`;
-            try {
-              await writeFile(temp, body);
-              await rename(temp, target);
-            } catch (error) {
-              await rm(temp, { force: true });
-              throw error;
-            }
+            await writeFile(temp, body, { flag: "wx" });
+            await rename(temp, target);
             json(res, { ok: true, fileName: name, size: body.length });
           } catch (error) {
+            await rm(temp, { force: true });
             res.statusCode = 500;
             res.end(error instanceof Error ? error.message : "erro ao gravar");
           }
-        });
-        return;
-      }
+          return;
+        }
 
-      res.statusCode = 405;
-      res.end("Method not allowed");
+        res.statusCode = 405;
+        res.end("Method not allowed");
+      })();
       return;
     }
 
