@@ -11,7 +11,8 @@ import {
 import { loadRegistry } from "../lib/romIdentity";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
-import { incompleteMessage, restoreFailureMessage } from "./capsuleMessages";
+import { incompleteMessage, recoveryMessage, restoreFailureMessage } from "./capsuleMessages";
+import { lastRecovery, recoverPendingRestore, RestoreError } from "../emulator/restoreTx";
 
 interface Props {
   /** As ROMs que têm arquivos no navegador. */
@@ -43,6 +44,23 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
   const [pendente, setPendente] = useState<Pendente | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [recuperacao, setRecuperacao] = useState(() => lastRecovery());
+  const pendenteRecuperar = recuperacao.result === "pending";
+
+  const recuperar = async () => {
+    setOcupado(true);
+    try {
+      const core = await getCore();
+      const result = await recoverPendingRestore(core);
+      setRecuperacao(lastRecovery());
+      onRestored();
+      if (result === "none") setAviso(t("Não há restauração pendente.", "No pending restore."));
+    } catch {
+      setRecuperacao({ result: "pending" });
+    } finally {
+      setOcupado(false);
+    }
+  };
   const rom = roms.includes(escolhida) ? escolhida : (currentRom ?? roms[0]);
 
   const exportar = async () => {
@@ -124,6 +142,7 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
       setAviso(t(`Aventura de ${adventureLabel(target)} restaurada.`, `${adventureLabel(target)} adventure restored.`));
     } catch (error) {
       onRestored();
+      if (error instanceof RestoreError && error.pending) setRecuperacao({ result: "pending", rom: target });
       setAviso(restoreFailureMessage(lang, error));
     } finally {
       setOcupado(false);
@@ -144,6 +163,16 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
           "One file with a game's save, save states, screenshots, journal and records. The ROM is not included."
         )}
       </p>
+      {recoveryMessage(lang, recuperacao.result, recuperacao.rom && adventureLabel(recuperacao.rom)) && (
+        <p className="play-panel-hint" role="status">
+          {recoveryMessage(lang, recuperacao.result, recuperacao.rom && adventureLabel(recuperacao.rom))}{" "}
+          {pendenteRecuperar && (
+            <button type="button" onClick={() => void recuperar()} disabled={ocupado}>
+              {t("Recuperar agora", "Recover now")}
+            </button>
+          )}
+        </p>
+      )}
       {roms.length > 0 ? (
         <div className="play-save-actions">
           <label className="visually-hidden" htmlFor="capsule-rom">{t("Jogo da cápsula", "Capsule game")}</label>

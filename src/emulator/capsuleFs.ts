@@ -86,17 +86,29 @@ export async function collectRomFiles(fs: CapsuleFs, dirs: CapsuleDirs, rom: str
   return out;
 }
 
-const BAK = ".antes-da-capsula";
+export const BAK = ".antes-da-capsula";
+
+function existe(fs: CapsuleFs, path: string): boolean {
+  const i = path.lastIndexOf("/");
+  try {
+    return fs.readdir(path.slice(0, i)).includes(path.slice(i + 1));
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Grava os arquivos do plano sob o nome `rom`. Tudo ou nada.
- *
- * Cada arquivo que seria substituído é primeiro renomeado para um nome de
- * reserva. Se qualquer gravação falhar, o que foi escrito é apagado e as
- * reservas voltam ao lugar: restaurar uma cápsula nunca deixa a aventura pior
- * do que estava. Só com tudo gravado as reservas são removidas.
+ * As mudanças de arquivo de uma restauração, ainda sem fazer: o que vira
+ * reserva (renomeado para `<nome>.antes-da-capsula`) e o que é gravado.
+ * Quem substitui o quê é conferido no FS agora, não na prévia.
  */
-export function writeRestore(
+export interface FileOps {
+  /** Caminhos que existem e serão renomeados para a reserva. */
+  reserve: string[];
+  write: { path: string; base64: string }[];
+}
+
+export function planFileOps(
   fs: CapsuleFs,
   dirs: CapsuleDirs,
   rom: string,
@@ -107,60 +119,97 @@ export function writeRestore(
    * tempo, deixado para trás, carregaria um jogo que não é o desta.
    */
   exact = false
-): number {
+): FileOps {
   const base = romBaseName(rom);
-  const reservas: string[] = [];
-  const escritos: string[] = [];
-  try {
-    if (exact) {
-      const gravados = new Set(steps.filter((s) => s.action === "write").map((s) => s.file.suffix));
-      for (const suffix of existingSuffixes(fs, dirs, rom)) {
-        const tipo = tipoDe(suffix);
-        // Captura de tela é foto, não estado do jogo: fica em qualquer ramificação.
-        if (!tipo || tipo.kind === "screenshot" || gravados.has(suffix)) continue;
-        const path = `${dirs[tipo.dir]}/${base}${suffix}`;
-        fs.rename(path, path + BAK);
-        reservas.push(path);
-      }
+  const reserve: string[] = [];
+  const write: FileOps["write"] = [];
+  const gravados = new Set(steps.filter((s) => s.action === "write").map((s) => s.file.suffix));
+  if (exact) {
+    for (const suffix of existingSuffixes(fs, dirs, rom)) {
+      const tipo = tipoDe(suffix);
+      // Captura de tela é foto, não estado do jogo: fica em qualquer ramificação.
+      if (!tipo || tipo.kind === "screenshot" || gravados.has(suffix)) continue;
+      reserve.push(`${dirs[tipo.dir]}/${base}${suffix}`);
     }
-    for (const step of steps) {
-      if (step.action !== "write") continue;
-      const tipo = tipoDe(step.file.suffix);
-      if (!tipo) continue;
-      const path = `${dirs[tipo.dir]}/${base}${step.file.suffix}`;
-      if (step.overwrites) {
-        fs.rename(path, path + BAK);
-        reservas.push(path);
-      }
-      fs.writeFile(path, fromBase64(step.file.base64));
-      escritos.push(path);
-    }
-  } catch (error) {
-    const falhas: string[] = [];
-    for (const path of escritos) {
-      try {
-        fs.unlink(path);
-      } catch {
-        falhas.push(path);
-      }
-    }
-    for (const path of reservas) {
-      try {
-        fs.rename(path + BAK, path);
-      } catch {
-        // a reserva continua lá, com o nome de reserva
-        falhas.push(path);
-      }
-    }
-    if (falhas.length > 0) throw new RollbackError(falhas, error);
-    throw error;
   }
-  for (const path of reservas) {
+  for (const step of steps) {
+    if (step.action !== "write") continue;
+    const tipo = tipoDe(step.file.suffix);
+    if (!tipo) continue;
+    const path = `${dirs[tipo.dir]}/${base}${step.file.suffix}`;
+    if (existe(fs, path)) reserve.push(path);
+    write.push({ path, base64: step.file.base64 });
+  }
+  return { reserve, write };
+}
+
+/** Faz as mudanças. Para no primeiro erro; desfazer é com `revertFileOps`. */
+export function applyFileOps(fs: CapsuleFs, ops: FileOps): void {
+  for (const path of ops.reserve) fs.rename(path, path + BAK);
+  for (const { path, base64 } of ops.write) fs.writeFile(path, fromBase64(base64));
+}
+
+/**
+ * Põe os arquivos como estavam antes de `applyFileOps`, a partir de qualquer
+ * ponto em que ele tenha parado — ou de um FS que nunca o viu, depois de um
+ * fechamento no meio. Decide pelo que existe: reserva presente volta ao
+ * lugar; arquivo gravado sem reserva é apagado. Devolve o que não conseguiu.
+ */
+export function revertFileOps(fs: CapsuleFs, ops: FileOps): string[] {
+  const falhas: string[] = [];
+  const reservados = new Set(ops.reserve);
+  for (const { path } of ops.write) {
+    if (reservados.has(path) || !existe(fs, path)) continue;
     try {
-      fs.unlink(path + BAK);
+      fs.unlink(path);
+    } catch {
+      falhas.push(path);
+    }
+  }
+  for (const path of ops.reserve) {
+    if (!existe(fs, path + BAK)) continue;
+    try {
+      if (existe(fs, path)) fs.unlink(path);
+      fs.rename(path + BAK, path);
+    } catch {
+      falhas.push(path);
+    }
+  }
+  return falhas;
+}
+
+/** Com tudo confirmado, as reservas saem. Uma que sobre não afeta o jogo. */
+export function dropReserves(fs: CapsuleFs, ops: FileOps): void {
+  for (const path of ops.reserve) {
+    try {
+      if (existe(fs, path + BAK)) fs.unlink(path + BAK);
     } catch {
       // sobra um arquivo de reserva; não afeta o jogo
     }
   }
-  return escritos.length;
+}
+
+/**
+ * Grava os arquivos do plano sob o nome `rom`. Tudo ou nada, só no FS: se
+ * qualquer gravação falhar, o que foi escrito é apagado e as reservas voltam
+ * ao lugar; se nem isso der, sobe `RollbackError`. A restauração completa,
+ * com registros, detonado e sincronização, é a de `restoreTx.ts`.
+ */
+export function writeRestore(
+  fs: CapsuleFs,
+  dirs: CapsuleDirs,
+  rom: string,
+  steps: readonly RestoreStep[],
+  exact = false
+): number {
+  const ops = planFileOps(fs, dirs, rom, steps, exact);
+  try {
+    applyFileOps(fs, ops);
+  } catch (error) {
+    const falhas = revertFileOps(fs, ops);
+    if (falhas.length > 0) throw new RollbackError(falhas, error);
+    throw error;
+  }
+  dropReserves(fs, ops);
+  return ops.write.length;
 }

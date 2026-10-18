@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildCapsule, restoreCapsule, RestoreError, switchToBranch } from "./capsuleActions";
+import { resetRestoreLockForTests } from "./restoreTx";
 import type { mGBAEmulator } from "./types";
 import { capsuleFile, CapsuleIncompleteError, planRestore, type Capsule } from "../lib/capsule";
 import * as guideStore from "../lib/guideStore";
@@ -78,7 +79,9 @@ describe("buildCapsule incompleta (AUD-05)", () => {
   });
 });
 
-describe("restoreCapsule diz se desfez (mensagem de AUD-01)", () => {
+describe("restoreCapsule diz se desfez (AUD-01)", () => {
+  beforeEach(() => resetRestoreLockForTests());
+
   it("falha nos arquivos volta tudo e pode dizer que nada mudou", async () => {
     const { core, FS, files } = fakeCore();
     FS.writeFile = () => {
@@ -88,23 +91,23 @@ describe("restoreCapsule diz se desfez (mensagem de AUD-01)", () => {
     const erro = await restoreCapsule(core, c, "demo.gba", planRestore(c, new Set([".sav"]), "mGBA 1")).catch((e: unknown) => e);
     expect(erro).toMatchObject({ stage: "files", reverted: true });
     expect([...files.get("/saves/demo.sav")!]).toEqual([1]);
-    expect(restoreFailureMessage("pt", erro)).toContain("voltaram ao que eram");
+    expect(restoreFailureMessage("pt", erro)).toContain("foi desfeita");
   });
 
-  it("falha na sincronização não promete que a aventura está como antes", async () => {
+  it("sincronização que nunca volta: não promete nada e deixa a recuperação pendente", async () => {
     const { core, FSSync } = fakeCore();
     FSSync.mockRejectedValue(new Error("quota"));
     const c = capsula([await capsuleFile("save", ".sav", new Uint8Array([9]))]);
     const erro = await restoreCapsule(core, c, "demo.gba", planRestore(c, new Set([".sav"]), "mGBA 1")).catch((e: unknown) => e);
     expect(erro).toBeInstanceOf(RestoreError);
-    expect(erro).toMatchObject({ stage: "sync", reverted: false });
+    expect(erro).toMatchObject({ stage: "sync", reverted: false, pending: true });
     const msg = restoreFailureMessage("pt", erro);
     expect(msg).not.toContain("como antes");
-    expect(msg).toContain("parou no meio");
+    expect(msg).toContain("não terminou");
   });
 
-  it("falha nos registros também é parcial", async () => {
-    const { core } = fakeCore();
+  it("falha nos registros devolve o save que já tinha sido trocado", async () => {
+    const { core, files } = fakeCore();
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("quota");
     });
@@ -112,7 +115,8 @@ describe("restoreCapsule diz se desfez (mensagem de AUD-01)", () => {
       "pokedex:personal-adventures": { title: "nova" },
     });
     const erro = await restoreCapsule(core, c, "demo.gba", planRestore(c, new Set([".sav"]), "mGBA 1")).catch((e: unknown) => e);
-    expect(erro).toMatchObject({ stage: "data", reverted: false });
+    expect(erro).toMatchObject({ stage: "data", reverted: true });
+    expect([...files.get("/saves/demo.sav")!]).toEqual([1]);
   });
 });
 

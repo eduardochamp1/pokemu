@@ -267,9 +267,48 @@ export function collectRomData(
   return out;
 }
 
+/** As chaves dos registros por ROM, na ordem em que são gravados. */
+export const ROM_DATA_KEYS: readonly string[] = POR_ROM.map((r) => r.key);
+
 /**
- * Põe as entradas da cápsula nos registros, sob o nome `rom`. Só toca na
- * entrada desta ROM: as outras aventuras ficam como estão.
+ * A entrada de `rom` em cada registro, como está gravada; `null` onde não há.
+ * Ao contrário de `collectRomData`, um registro ilegível derruba a leitura:
+ * é o retrato do "antes" de uma restauração, e um retrato com buraco não
+ * serve para desfazer.
+ */
+export function romEntries(storage: ReadableStorage, rom: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const { key, shape } of POR_ROM) {
+    const parsed = lerRegistro(storage, key, shape);
+    const entry =
+      parsed === null
+        ? undefined
+        : Array.isArray(parsed)
+          ? parsed.find((e) => (e as { rom?: unknown } | null)?.rom === rom)
+          : (parsed as Record<string, unknown>)[rom];
+    out[key] = entry ?? null;
+  }
+  return out;
+}
+
+function lerRegistro(storage: ReadableStorage, key: string, shape: "array" | "record"): unknown[] | object | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(storage.getItem(key) ?? "null");
+  } catch {
+    throw new Error(`registro ilegível: ${key}`);
+  }
+  if (parsed === null) return null;
+  if (typeof parsed !== "object" || (shape === "array") !== Array.isArray(parsed)) {
+    throw new Error(`registro ilegível: ${key}`);
+  }
+  return parsed as unknown[] | object;
+}
+
+/**
+ * Troca a entrada de `rom` em cada registro de `entries`: um objeto entra sob
+ * o nome `rom`, `null` tira a entrada. Só toca na entrada desta ROM — as
+ * outras aventuras ficam como estão.
  *
  * Primeiro calcula tudo: um registro existente que não dá para ler recusa a
  * operação antes de qualquer gravação, em vez de ser trocado por um novo que
@@ -277,26 +316,32 @@ export function collectRomData(
  * foram feitas são desfeitas — chave que não existia é removida. Se desfazer
  * também falhar, sobe um `RollbackError` dizendo quais chaves ficaram.
  */
-export function applyRomData(storage: StorageLike, rom: string, data: Record<string, unknown>): void {
+export function writeRomEntries(storage: StorageLike, rom: string, entries: Record<string, unknown>): void {
   const plano: { key: string; raw: string | null; next: string }[] = [];
   for (const { key, shape } of POR_ROM) {
-    if (!(key in data)) continue;
-    const entry = data[key];
-    if (!entry || typeof entry !== "object") continue;
+    if (!(key in entries)) continue;
+    const entry = entries[key];
+    if (entry !== null && (typeof entry !== "object" || Array.isArray(entry))) continue;
     const raw = storage.getItem(key);
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw ?? "null");
-    } catch {
-      throw new Error(`registro ilegível: ${key}`);
+    const parsed = lerRegistro(storage, key, shape);
+    const nova = entry === null ? null : { ...entry, rom };
+    const atual =
+      parsed === null
+        ? undefined
+        : Array.isArray(parsed)
+          ? parsed.find((e) => (e as { rom?: unknown } | null)?.rom === rom)
+          : (parsed as Record<string, unknown>)[rom];
+    // Já está assim: não grava. Desfazer o que nem chegou a mudar não pode falhar.
+    if (JSON.stringify(atual ?? null) === JSON.stringify(nova)) continue;
+    let next: unknown;
+    if (shape === "array") {
+      const resto = ((parsed as unknown[] | null) ?? []).filter((e) => (e as { rom?: unknown } | null)?.rom !== rom);
+      next = nova ? [...resto, nova] : resto;
+    } else {
+      const { [rom]: _antes, ...resto } = (parsed as Record<string, unknown> | null) ?? {};
+      void _antes;
+      next = nova ? { ...resto, [rom]: nova } : resto;
     }
-    const lista = shape === "array" ? Array.isArray(parsed) : !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
-    if (parsed !== null && !lista) throw new Error(`registro ilegível: ${key}`);
-    const nova = { ...(entry as object), rom };
-    const next =
-      shape === "array"
-        ? [...((parsed as unknown[] | null) ?? []).filter((e) => (e as { rom?: unknown } | null)?.rom !== rom), nova]
-        : { ...((parsed as object | null) ?? {}), [rom]: nova };
     plano.push({ key, raw, next: JSON.stringify(next) });
   }
   const feitos: { key: string; raw: string | null }[] = [];
@@ -318,4 +363,32 @@ export function applyRomData(storage: StorageLike, rom: string, data: Record<str
     if (falhas.length > 0) throw new RollbackError(falhas, error);
     throw error;
   }
+}
+
+/**
+ * As entradas que restaurar `data` grava. `merge` (cápsula importada) só
+ * troca o que a cápsula traz; `replace` (troca de ramificação) também tira o
+ * que ela não traz, para o futuro não vazar no passado.
+ */
+export function romDataPlan(data: Record<string, unknown>, mode: "merge" | "replace"): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of ROM_DATA_KEYS) {
+    const entry = data[key];
+    if (entry && typeof entry === "object" && !Array.isArray(entry)) out[key] = entry;
+    else if (mode === "replace") out[key] = null;
+  }
+  return out;
+}
+
+/**
+ * Põe as entradas da cápsula nos registros, sob o nome `rom`. Ver
+ * `writeRomEntries` para o tudo ou nada e `romDataPlan` para os modos.
+ */
+export function applyRomData(
+  storage: StorageLike,
+  rom: string,
+  data: Record<string, unknown>,
+  mode: "merge" | "replace" = "merge"
+): void {
+  writeRomEntries(storage, rom, romDataPlan(data, mode));
 }

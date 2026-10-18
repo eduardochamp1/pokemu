@@ -1,4 +1,4 @@
-import { RestoreError } from "../emulator/capsuleActions";
+import { RestoreError } from "../emulator/restoreTx";
 import { CapsuleIncompleteError, kindOfSuffix } from "../lib/capsule";
 import { tr, type Lang } from "../i18n/lang";
 
@@ -48,20 +48,53 @@ export function incompleteMessage(lang: Lang, error: unknown): string | null {
 }
 
 /**
- * O que dizer quando a restauração falha. Só afirma que nada mudou quando a
- * falha foi nos arquivos e eles voltaram ao lugar.
+ * O que dizer quando a restauração falha. Só afirma que nada mudou quando o
+ * coordenador confirma que a aventura voltou inteira (ou nem começou).
  */
 export function restoreFailureMessage(lang: Lang, error: unknown): string {
-  if (error instanceof RestoreError && error.reverted) {
-    return tr(
-      lang,
-      "A restauração falhou antes de mudar a aventura: os arquivos voltaram ao que eram. Verifique o espaço disponível.",
-      "The restore failed before changing the adventure: the files are back as they were. Check available storage."
-    );
+  if (error instanceof RestoreError) {
+    if (error.stage === "busy") {
+      return tr(lang, "Já há uma restauração em andamento. Espere ela terminar.", "A restore is already running. Wait for it to finish.");
+    }
+    if (error.reverted) {
+      return error.stage === "prepare"
+        ? tr(
+            lang,
+            "Não foi possível preparar a restauração, e nada foi alterado. Se uma restauração anterior ficou pendente, recupere-a primeiro; senão, verifique o espaço disponível.",
+            "Couldn't prepare the restore, and nothing was changed. If an earlier restore is pending, recover it first; otherwise check available storage."
+          )
+        : tr(
+            lang,
+            "A restauração falhou e foi desfeita: arquivos, registros e detonado estão como antes. Verifique o espaço disponível.",
+            "The restore failed and was undone: files, records and walkthrough are as they were. Check available storage."
+          );
+    }
+    if (error.pending) {
+      return tr(
+        lang,
+        "A restauração falhou e a volta ao estado anterior não terminou. O Pokemu tenta de novo ao abrir o emulador, ou agora pelo botão de recuperar. Não limpe os dados do site.",
+        "The restore failed and going back to the previous state didn't finish. Pokemu retries when the emulator opens, or now with the recover button. Don't clear site data."
+      );
+    }
   }
   return tr(
     lang,
-    "A restauração parou no meio e não pôde ser desfeita por completo: parte da aventura já foi substituída. Não feche o Pokemu; tente restaurar de novo ou exporte o que estiver lá.",
-    "The restore stopped midway and couldn't be fully undone: part of the adventure was already replaced. Don't close Pokemu; try restoring again or export what's there."
+    "A restauração falhou sem confirmar o estado da aventura. Exporte a cápsula dela antes de continuar jogando.",
+    "The restore failed without confirming the adventure's state. Export its capsule before playing on."
   );
+}
+
+/** O aviso depois de uma recuperação automática, ou `null`. */
+export function recoveryMessage(lang: Lang, result: string, rom?: string): string | null {
+  const nome = rom ?? "";
+  switch (result) {
+    case "reverted":
+      return tr(lang, `Uma restauração de ${nome} foi interrompida e desfeita: a aventura voltou ao que era antes dela.`, `A restore of ${nome} was interrupted and undone: the adventure is back to how it was before.`);
+    case "completed":
+      return tr(lang, `Uma restauração de ${nome} interrompida no fim foi concluída.`, `A restore of ${nome} interrupted at the end was completed.`);
+    case "pending":
+      return tr(lang, `Uma restauração interrompida ainda não pôde ser desfeita. Tente recuperar de novo.`, `An interrupted restore couldn't be undone yet. Try recovering again.`);
+    default:
+      return null;
+  }
 }

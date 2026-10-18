@@ -106,6 +106,14 @@ export function getCore(): Promise<mGBAEmulator> {
       const { default: mGBA } = await import("@thenick775/mgba-wasm");
       const core = (await mGBA({ canvas: getCanvas() })) as mGBAEmulator;
       await core.FSInit();
+      // Uma restauração interrompida (aba fechada, queda) termina ou é
+      // desfeita aqui, antes de qualquer jogo ler o save pela metade.
+      try {
+        const { recoverPendingRestore } = await import("./restoreTx");
+        await recoverPendingRestore(core);
+      } catch {
+        // o diário fica; a tela da cápsula oferece tentar de novo
+      }
       // Só em dev: o core vive fora da árvore do React e não há como
       // alcançá-lo pelo console para inspecionar o FS virtual ou testar uma
       // chamada. O build de produção não leva isto.

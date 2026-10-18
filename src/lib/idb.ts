@@ -1,8 +1,8 @@
 /**
  * O banco IndexedDB do site (`pokemu`) e um acesso chave → valor a cada store.
  *
- * Guarda o que não cabe no `localStorage`: o texto dos detonados e as
- * ramificações de aventura. Onde não há IndexedDB (testes, navegador com o
+ * Guarda o que não cabe no `localStorage`: o texto dos detonados, as
+ * ramificações de aventura e o diário da restauração em andamento. Onde não há IndexedDB (testes, navegador com o
  * banco bloqueado) cada store cai num `Map` em memória — vale só na sessão,
  * mas a tela continua funcionando.
  *
@@ -11,12 +11,17 @@
  */
 
 const DB_NAME = "pokemu";
-const DB_VERSION = 2;
-const STORES = ["guides", "branches"] as const;
+const DB_VERSION = 3;
+const STORES = ["guides", "branches", "journal"] as const;
 export type StoreName = (typeof STORES)[number];
 
 const temIdb = () => typeof indexedDB !== "undefined";
-const memoria: Record<StoreName, Map<string, unknown>> = { guides: new Map(), branches: new Map() };
+const memoria: Record<StoreName, Map<string, unknown>> = { guides: new Map(), branches: new Map(), journal: new Map() };
+
+/** Sem IndexedDB, nada daqui sobrevive a fechar a aba. */
+export function idbIsDurable(): boolean {
+  return temIdb();
+}
 
 function abrir(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

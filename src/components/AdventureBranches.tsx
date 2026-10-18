@@ -149,8 +149,8 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
       <h2>{t("Ramificações", "Branches")}</h2>
       <p className="play-panel-hint">
         {t(
-          "Guarde a aventura inteira com um nome para testar outro time ou outra escolha, e volte quando quiser. Fica neste navegador; para levar a outro aparelho, exporte a cápsula.",
-          "Keep the whole adventure under a name to try another team or choice, and come back whenever. It stays in this browser; to move it to another device, export the capsule."
+          "Guarde a aventura inteira com um nome para testar outro time ou outra escolha, e volte quando quiser. Voltar deixa a aventura exatamente como estava: save, pontos de retorno, diário, desafio, marcações e detonado. As capturas de tela são suas e ficam em todas as ramificações. Fica neste navegador; para levar a outro aparelho, exporte a cápsula.",
+          "Keep the whole adventure under a name to try another team or choice, and come back whenever. Returning puts the adventure exactly as it was: save, save states, journal, challenge, marks and walkthrough. Screenshots are yours and stay across all branches. It stays in this browser; to move it to another device, export the capsule."
         )}
       </p>
       <div className="branch-new">
