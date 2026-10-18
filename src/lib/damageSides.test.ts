@@ -67,3 +67,16 @@ describe("baseStatsOf com past_stats", () => {
     expect(baseStatsOf(p)?.atk).toBe(50);
   });
 });
+
+describe("Shedinja sem save (PS-03)", () => {
+  const BASE = { hp: 1, atk: 90, def: 45, spa: 30, spd: 30, spe: 40 };
+
+  it("tem HP 1 também no caminho genérico", () => {
+    expect(genericStats(BASE, 50, 292)).toMatchObject({ hp: 1, maxHp: 1 });
+  });
+
+  it("as outras espécies seguem a fórmula", () => {
+    expect(genericStats(BASE, 50, 1).maxHp).toBe(76);
+    expect(genericStats(BASE, 50).maxHp).toBe(76);
+  });
+});

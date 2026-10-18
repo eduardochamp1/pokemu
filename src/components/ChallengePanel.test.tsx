@@ -63,3 +63,21 @@ it("encerrar pede confirmação antes de apagar", () => {
   fireEvent.click(screen.getByRole("button", { name: "Apagar" }));
   expect(screen.getByRole("button", { name: "Começar um desafio neste jogo" })).toBeTruthy();
 });
+
+it("aventura de Gen 1/2: o time lido do save é conferido contra o limite fixo (PS-05)", async () => {
+  const { recordLegacyAdventure, reloadLegacyAdventures } = await import("../lib/legacyAdventures");
+  const { parseGen1Save } = await import("../emulator/saveParse/legacy");
+  const { legacyFixture } = await import("../emulator/saveParse/legacy.fixture");
+  const save = parseGen1Save(legacyFixture("red").bytes, "red", false)!;
+  const membro = save.party.find((m) => !m.egg && m.level !== null)!;
+  recordLegacyAdventure("Red.gb", save);
+  reloadLegacyAdventures();
+  render(<ChallengePanel rom="Red.gb" />);
+  fireEvent.click(screen.getByRole("button", { name: "Começar um desafio neste jogo" }));
+  fireEvent.change(screen.getByLabelText("Limite"), { target: { value: "fixo" } });
+  fireEvent.change(screen.getByLabelText("Nível"), { target: { value: String(Math.max(1, membro.level! - 1)) } });
+  expect(screen.getByRole("status").textContent).toContain(membro.nickname);
+  // O limite pelo líder não é oferecido como disponível em Red.
+  const gym = screen.getByRole("option", { name: /próximo líder/ }) as HTMLOptionElement;
+  expect(gym.disabled).toBe(true);
+});

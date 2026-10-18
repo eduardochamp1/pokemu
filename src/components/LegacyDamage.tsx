@@ -29,7 +29,10 @@ export default function LegacyDamage() {
   const aventuras = useLegacyAdventures();
   const activeRom = useActiveAdventure();
   const [params] = useSearchParams();
-  const { entry } = pickAdventure(aventuras, activeRom);
+  // Sem a ativa entre as de Gen 1/2, nada de análise de outra campanha: só o
+  // seletor, esperando a pessoa escolher.
+  const { entry: escolhida, matched } = pickAdventure(aventuras, activeRom);
+  const entry = matched ? escolhida : undefined;
   const generation = entry?.save.generation;
 
   const [catalog, setCatalog] = useState<LegacyCatalog | null>(null);
@@ -47,7 +50,8 @@ export default function LegacyDamage() {
 
   const lutadores = useMemo(() => entry?.save.party.filter((m) => !m.egg && m.stats && m.level !== null) ?? [], [entry]);
   const cenario = parseScenario(params, entry?.save.party.length ?? 0);
-  const [atacante, setAtacante] = useState(0);
+  // `null` = ninguém escolheu ainda: vale o cenário da URL, depois o primeiro.
+  const [atacante, setAtacante] = useState<number | null>(null);
   const [golpe, setGolpe] = useState<number | null>(null);
   const [alvo, setAlvo] = useState<number | null>(null);
   const [nivel, setNivel] = useState<number | null>(null);
@@ -57,11 +61,27 @@ export default function LegacyDamage() {
   const [screen, setScreen] = useState(false);
   const [weather, setWeather] = useState<"none" | "rain" | "sun">("none");
 
+  // Outra aventura é outro contexto: escolhas e condições da anterior não
+  // valem para ela (o time, a geração e o clima podem ser outros).
+  const [deQual, setDeQual] = useState(entry?.rom);
+  if (deQual !== entry?.rom) {
+    setDeQual(entry?.rom);
+    setAtacante(null);
+    setGolpe(null);
+    setAlvo(null);
+    setNivel(null);
+    setDv(15);
+    setCrit(false);
+    setBurned(false);
+    setScreen(false);
+    setWeather("none");
+  }
+
   if (aventuras.length === 0) return null;
 
   // O cenário da URL fala em posição no time inteiro; aqui a lista não tem ovos.
-  const doCenario = cenario.atk !== undefined ? lutadores.indexOf(entry!.save.party[cenario.atk]) : -1;
-  const membro = lutadores[atacante] ?? lutadores[Math.max(0, doCenario)] ?? lutadores[0];
+  const doCenario = cenario.atk !== undefined && entry ? lutadores.indexOf(entry.save.party[cenario.atk]) : -1;
+  const membro = (atacante !== null ? lutadores[atacante] : undefined) ?? lutadores[doCenario] ?? lutadores[0];
   const meusGolpes = pronto && membro
     ? membro.moves.flatMap((mv) => {
         const g = pronto.moves.find((m) => m[0] === mv.id);
@@ -108,12 +128,13 @@ export default function LegacyDamage() {
         <label>
           {t("Aventura", "Adventure")}
           <select value={entry?.rom ?? ""} onChange={(e) => setActiveAdventure(e.target.value)}>
+            {!entry && <option value="">{t("Escolha uma aventura de Gen 1/2…", "Choose a Gen 1/2 adventure…")}</option>}
             {aventuras.map((a) => (
               <option key={a.rom} value={a.rom}>{adventureLabel(a.rom)}</option>
             ))}
           </select>
         </label>
-        {!pronto ? (
+        {!entry ? null : !pronto ? (
           <p className="page-scope">{t("Carregando os dados da geração…", "Loading the generation's data…")}</p>
         ) : lutadores.length === 0 ? (
           <p className="page-scope">{t("O save não tem pokémon com status gravados no time.", "The save has no party pokémon with recorded stats.")}</p>

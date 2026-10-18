@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CHALLENGE_KEY,
   areaUsed,
+  capCheck,
+  gymCapSupported,
   endChallenge,
   isChallenge,
   levelCapFor,
@@ -151,5 +153,30 @@ describe("outra aba (PS-02)", () => {
     expect(() => updateChallenge("a.gba", { custom: ["daqui"] })).toThrow(StaleWriteError);
     expect(gravado()["a.gba"].custom).toEqual(["da outra aba"]);
     expect(() => endChallenge("a.gba")).not.toThrow();
+  });
+});
+
+describe("limite com time de qualquer geração (PS-05)", () => {
+  it("time legado acima do limite fixo gera alerta", () => {
+    const r = capCheck([{ nickname: "PIKACHU", level: 30 }, { nickname: "ONIX", level: 12 }], 20);
+    expect(r.over.map((m) => m.nickname)).toEqual(["PIKACHU"]);
+    expect(r.allWithin).toBe(false);
+  });
+
+  it("nível desconhecido não é aprovado como dentro do limite", () => {
+    const r = capCheck([{ nickname: "MEW", level: null }], 20);
+    expect(r).toEqual({ over: [], unknown: [{ nickname: "MEW", level: null }], allWithin: false });
+  });
+
+  it("sem time, nada é aprovado", () => {
+    expect(capCheck(null, 20).allWithin).toBe(false);
+    expect(capCheck([], 20).allWithin).toBe(false);
+  });
+
+  it("limite pelo líder só nas edições com guia", () => {
+    expect(gymCapSupported("emerald")).toBe(true);
+    expect(gymCapSupported("frlg")).toBe(true);
+    expect(gymCapSupported("rs")).toBe(false);
+    expect(gymCapSupported(undefined)).toBe(false);
   });
 });

@@ -52,9 +52,12 @@ const EV_0: StatSpread = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 /**
  * Status de uma espécie sem save: IVs no máximo, sem EVs, natureza neutra
  * (Hardy). É a suposição mais comum em calculadora — e fica dita na tela.
+ *
+ * `national` leva a espécie até a fórmula: Shedinja (292) tem HP 1 em
+ * qualquer nível, a mesma regra do caminho com save.
  */
-export function genericStats(base: StatSpread, level: number): StatSpread & { maxHp: number } {
-  const s = expectedGen3Stats(base, IV_31, EV_0, level, 0);
+export function genericStats(base: StatSpread, level: number, national?: number): StatSpread & { maxHp: number } {
+  const s = expectedGen3Stats(base, IV_31, EV_0, level, 0, national);
   return { ...s, maxHp: s.hp };
 }
 

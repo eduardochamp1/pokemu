@@ -2,16 +2,19 @@ import { useState } from "react";
 import {
   RULES,
   areaUsed,
+  capCheck,
   endChallenge,
+  gymCapSupported,
   levelCapFor,
-  overCap,
   startChallenge,
   updateChallenge,
   useChallenge,
+  type CapMember,
   type Challenge,
   type Encounter,
 } from "../lib/challenge";
 import { useTrainerEntries } from "../lib/trainerLog";
+import { useLegacyAdventures } from "../lib/legacyAdventures";
 import { localeOf, tr, useLang } from "../i18n/lang";
 import { StaleWriteError } from "../lib/recordStore";
 import "../styles/journal.css";
@@ -31,6 +34,14 @@ export default function ChallengePanel({ rom }: { rom: string }) {
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const challenge = useChallenge(rom);
   const entry = useTrainerEntries().find((e) => e.rom === rom);
+  const legado = useLegacyAdventures().find((a) => a.rom === rom);
+  // O time de qualquer geração: Gen 3 pela ficha, Gen 1/2 pela aventura legada.
+  const time: CapMember[] | null = entry?.team
+    ? entry.team.map((m) => ({ nickname: m.nickname, level: m.level }))
+    : legado
+      ? legado.save.party.filter((m) => !m.egg).map((m) => ({ nickname: m.nickname, level: m.level }))
+      : null;
+  const jogoGen3 = entry?.game ?? (entry ? "emerald" : undefined);
   const [erro, setErro] = useState<string | null>(null);
   const [area, setArea] = useState("");
   const [especie, setEspecie] = useState("");
@@ -72,8 +83,9 @@ export default function ChallengePanel({ rom }: { rom: string }) {
     );
   }
 
-  const cap = levelCapFor(challenge.levelCap, entry?.game ?? (entry ? "emerald" : undefined), entry?.trainer.badges ?? undefined);
-  const acima = overCap(entry?.team ?? [], cap);
+  const cap = levelCapFor(challenge.levelCap, jogoGen3, entry?.trainer.badges ?? undefined);
+  const conferido = capCheck(time, cap);
+  const acima = conferido.over;
   const repetida = area.trim() !== "" && areaUsed(challenge.encounters, area);
   const data = (at: number) => new Date(at).toLocaleDateString(localeOf(lang), { day: "2-digit", month: "2-digit" });
   const rotuloResultado = (o: Encounter["outcome"]) =>
@@ -132,7 +144,11 @@ export default function ChallengePanel({ rom }: { rom: string }) {
         {t("Limite", "Cap")}
         <select value={capValor === "gym" || capValor === "" ? capValor : "fixo"} onChange={(e) => mudar({ levelCap: e.target.value === "fixo" ? 20 : definirCap(e.target.value) })}>
           <option value="">{t("Sem limite", "No cap")}</option>
-          <option value="gym">{t("Pokémon mais forte do próximo líder", "Next leader's strongest pokémon")}</option>
+          <option value="gym" disabled={!gymCapSupported(jogoGen3) && capValor !== "gym"}>
+            {gymCapSupported(jogoGen3)
+              ? t("Pokémon mais forte do próximo líder", "Next leader's strongest pokémon")
+              : t("Pokémon mais forte do próximo líder (só Emerald e FR/LG)", "Next leader's strongest pokémon (Emerald and FR/LG only)")}
+          </option>
           <option value="fixo">{t("Nível fixo", "Fixed level")}</option>
         </select>
       </label>
@@ -163,9 +179,14 @@ export default function ChallengePanel({ rom }: { rom: string }) {
                   `Limite ${cap}. Acima dele no último save: ${acima.map((m) => `${m.nickname} (${m.level})`).join(", ")}.`,
                   `Cap ${cap}. Above it in the last save: ${acima.map((m) => `${m.nickname} (${m.level})`).join(", ")}.`
                 )
-              : entry?.team?.length
+              : conferido.allWithin
                 ? t(`Limite ${cap}. No último save lido, todo o time está dentro dele.`, `Cap ${cap}. In the last save read, the whole team is within it.`)
-                : t(`Limite ${cap}. Sem time lido do save para conferir.`, `Cap ${cap}. No team read from the save to check.`)}
+                : conferido.unknown.length
+                  ? t(
+                      `Limite ${cap}. O save não diz o nível de ${conferido.unknown.map((m) => m.nickname).join(", ")}: não dá para conferir.`,
+                      `Cap ${cap}. The save doesn't give the level of ${conferido.unknown.map((m) => m.nickname).join(", ")}: can't check.`
+                    )
+                  : t(`Limite ${cap}. Sem time lido do save para conferir.`, `Cap ${cap}. No team read from the save to check.`)}
         </p>
       )}
 

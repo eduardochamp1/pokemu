@@ -6,6 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { parseScenario } from "../lib/damageScenario";
 import { useMoveDetail, usePokemonDetail, usePokemonIndex } from "../hooks/usePokemon";
 import { useTrainerEntries, type TrainerEntry } from "../lib/trainerLog";
+import { useLegacyAdventures } from "../lib/legacyAdventures";
 import type { Gen3PartyMember } from "../emulator/saveParse/gen3";
 import {
   calcGen3Damage,
@@ -72,7 +73,7 @@ function useLado(sel: Sel, team: Gen3PartyMember[]): Lado {
       pokemon: p,
       nome: p ? pokemonLabel(p.name) : sel.kind === "free" ? sel.slug : "",
       level,
-      stats: base ? genericStats(base, level) : undefined,
+      stats: base ? genericStats(base, level, p?.id) : undefined,
       types,
       ability: p ? gen3Abilities(p)[0] : undefined,
       moves: p ? gen3Learnset(p).map((slug) => ({ key: slug, label: prettyMoveName(slug) })) : [],
@@ -87,20 +88,42 @@ function useLado(sel: Sel, team: Gen3PartyMember[]): Lado {
  */
 const DamagePage = () => {
   const entries = useTrainerEntries();
+  const legadas = useLegacyAdventures();
   const activeRom = useActiveAdventure();
-  const { entry } = pickAdventure(entries, activeRom);
+  // A aventura ativa decide a geração. Sendo de Gen 1/2, as ferramentas de
+  // Gen 3 não pegam calado a primeira ficha de Gen 3: ficam em simulação
+  // livre, e a calculadora de Gen 1/2 vem primeiro.
+  const ativaLegada = activeRom !== undefined && legadas.some((a) => a.rom === activeRom);
+  const { entry: gen3 } = pickAdventure(entries, activeRom);
+  const entry = ativaLegada ? undefined : gen3;
   return (
     <>
-      <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setActiveAdventure} />
+      {ativaLegada && (
+        <div className="trainer-shell">
+          <LegacyDamage />
+        </div>
+      )}
+      <DamageCalculator key={entry?.rom ?? "free"} entry={entry} entries={entries} onSelect={setActiveAdventure} legacyActive={ativaLegada} />
       <div className="trainer-shell">
         <TeamLab entry={entry} />
-        <LegacyDamage />
+        {!ativaLegada && <LegacyDamage />}
       </div>
     </>
   );
 };
 
-const DamageCalculator = ({ entry, entries, onSelect }: { entry?: TrainerEntry; entries: TrainerEntry[]; onSelect: (rom: string) => void }) => {
+const DamageCalculator = ({
+  entry,
+  entries,
+  onSelect,
+  legacyActive = false,
+}: {
+  entry?: TrainerEntry;
+  entries: TrainerEntry[];
+  onSelect: (rom: string) => void;
+  /** A aventura ativa é de Gen 1/2: aqui fica a simulação livre de Gen 3. */
+  legacyActive?: boolean;
+}) => {
   const lang = useLang();
   const t = (pt: string, en: string) => tr(lang, pt, en);
   const team = entry?.team ?? [];
@@ -168,6 +191,7 @@ const DamageCalculator = ({ entry, entries, onSelect }: { entry?: TrainerEntry; 
       <label className="page-selector">{t("Time da aventura · Gen 3", "Adventure team · Gen 3")}
         <select value={entry?.rom ?? ""} onChange={event => onSelect(event.target.value)} disabled={!entries.length}>
           {!entries.length && <option value="">{t("Sem save — simulação com Pokémon escolhidos", "No save — simulate with selected Pokémon")}</option>}
+          {entries.length > 0 && legacyActive && <option value="">{t("Aventura ativa é de Gen 1/2 — simulação livre", "Active adventure is Gen 1/2 — free simulation")}</option>}
           {entries.map(entry => <option key={entry.rom} value={entry.rom}>{entry.rom.replace(/\.[^.]+$/, "")}</option>)}
         </select>
       </label>

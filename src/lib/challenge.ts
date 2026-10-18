@@ -181,6 +181,32 @@ export function levelCapFor(
   return Math.max(...gyms[proximo].party.map((m) => m.level));
 }
 
+/** Um membro do time como o desafio o vê, de qualquer geração. Nível `null` = o save não diz. */
+export interface CapMember {
+  nickname: string;
+  level: number | null;
+}
+
+/**
+ * Confere o time contra o limite. Nível desconhecido não passa como dentro:
+ * vai para `unknown`, e o time só está "todo dentro" quando todos foram
+ * conferidos.
+ */
+export function capCheck(
+  team: readonly CapMember[] | null,
+  cap: number | null
+): { over: CapMember[]; unknown: CapMember[]; allWithin: boolean } {
+  if (cap === null || !team || team.length === 0) return { over: [], unknown: [], allWithin: false };
+  const over = team.filter((m) => m.level !== null && m.level > cap);
+  const unknown = team.filter((m) => m.level === null);
+  return { over, unknown, allWithin: over.length === 0 && unknown.length === 0 };
+}
+
+/** O limite pelo próximo líder só existe onde há guia de ginásios com as insígnias do save. */
+export function gymCapSupported(game: "emerald" | "frlg" | "rs" | undefined): boolean {
+  return game === "emerald" || game === "frlg";
+}
+
 /** Quem do time está acima do limite: a única regra que o save prova. */
 export function overCap(team: readonly { nickname: string; level: number }[], cap: number | null): { nickname: string; level: number }[] {
   if (cap === null) return [];
