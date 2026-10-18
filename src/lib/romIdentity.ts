@@ -142,38 +142,104 @@ const POR_NOME: { key: string; shape: "array" | "record" }[] = [
 
 /**
  * Leva os dados de `from` para `to` em cada registro. Devolve as chaves que
- * mudaram.
+ * mudaram; as que têm dados nos dois nomes vão para `conflicts`.
  *
  * Nunca sobrescreve: se `to` já tem dados num registro, aquele registro fica
- * como está — quem tem as duas coisas escolhe depois, e nada se perde.
+ * como está — quem tem as duas coisas escolhe depois, e nada se perde. Calcula
+ * tudo antes e grava tudo ou nada: se uma gravação falhar, as feitas voltam.
+ * Rodar de novo depois de uma interrupção só leva o que ficou para trás.
  */
-export function renameRomData(storage: StorageLike, from: string, to: string): string[] {
-  const mudou: string[] = [];
+export function renameRomData(storage: StorageLike, from: string, to: string, conflicts: string[] = []): string[] {
+  const plano: { key: string; raw: string; next: string }[] = [];
   for (const { key, shape } of POR_NOME) {
+    const raw = storage.getItem(key);
     let parsed: unknown;
     try {
-      parsed = JSON.parse(storage.getItem(key) ?? "null");
+      parsed = JSON.parse(raw ?? "null");
     } catch {
       continue;
     }
+    if (raw === null) continue;
     if (shape === "array") {
       if (!Array.isArray(parsed)) continue;
       const romDe = (e: unknown) => (e as { rom?: unknown } | null)?.rom;
-      if (!parsed.some((e) => romDe(e) === from) || parsed.some((e) => romDe(e) === to)) continue;
+      if (!parsed.some((e) => romDe(e) === from)) continue;
+      if (parsed.some((e) => romDe(e) === to)) {
+        conflicts.push(key);
+        continue;
+      }
       const next = parsed.map((e) => (romDe(e) === from ? { ...(e as object), rom: to } : e));
-      storage.setItem(key, JSON.stringify(next));
-      mudou.push(key);
+      plano.push({ key, raw, next: JSON.stringify(next) });
     } else {
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) continue;
       const rec = parsed as Record<string, unknown>;
-      if (!(from in rec) || to in rec) continue;
+      if (!(from in rec)) continue;
+      if (to in rec) {
+        conflicts.push(key);
+        continue;
+      }
       const { [from]: entry, ...rest } = rec;
       const movida = entry && typeof entry === "object" ? { ...entry, rom: to } : entry;
-      storage.setItem(key, JSON.stringify({ ...rest, [to]: movida }));
-      mudou.push(key);
+      plano.push({ key, raw, next: JSON.stringify({ ...rest, [to]: movida }) });
     }
   }
-  return mudou;
+  const feitos: { key: string; raw: string }[] = [];
+  try {
+    for (const p of plano) {
+      storage.setItem(p.key, p.next);
+      feitos.push(p);
+    }
+  } catch (error) {
+    for (const { key, raw } of feitos.reverse()) {
+      try {
+        storage.setItem(key, raw);
+      } catch {
+        // o erro original sobe; rodar de novo termina o que faltou
+      }
+    }
+    throw error;
+  }
+  return plano.map((p) => p.key);
+}
+
+/** As chaves em que `from` e `to` têm dados ao mesmo tempo. Não grava nada. */
+export function romDataConflicts(storage: StorageLike, from: string, to: string): string[] {
+  const conflicts: string[] = [];
+  const simulado: StorageLike = {
+    getItem: (k) => storage.getItem(k),
+    setItem: () => {},
+  };
+  renameRomData(simulado, from, to, conflicts);
+  return conflicts;
+}
+
+/**
+ * Decide a identidade de um arquivo que entrou, sem gravar nada. Quem chama
+ * migra os arquivos e os dados e só então confirma com `commitRegistration`:
+ * enquanto o índice não muda, uma renomeação interrompida é reconhecida de
+ * novo na próxima vez e continua de onde parou.
+ */
+export function resolveRegistration(
+  storage: StorageLike,
+  rom: string,
+  hash: string,
+  size: number,
+  present: ReadonlySet<string>,
+  source?: RomSource,
+  newId: () => string = () => crypto.randomUUID(),
+  now: number = Date.now()
+): Resolution & { changed: boolean } {
+  const atual = loadRegistry(storage);
+  let res = resolveIdentity(atual, rom, hash, size, present, newId, now);
+  if (source && res.identity.source !== source) {
+    const identity = { ...res.identity, source };
+    res = { ...res, identity, registry: { ...res.registry, [rom]: identity } };
+  }
+  return { ...res, changed: res.registry !== atual };
+}
+
+export function commitRegistration(storage: StorageLike, res: Resolution & { changed: boolean }): void {
+  if (res.changed) storage.setItem(ROM_IDENTITY_KEY, JSON.stringify(res.registry));
 }
 
 /**

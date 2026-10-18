@@ -1,4 +1,5 @@
 import { romBaseName } from "./saveStates";
+import { RollbackError } from "../lib/capsule";
 
 /**
  * Renomeia, dentro do FS do core, o que pertence a uma ROM que mudou de nome.
@@ -25,27 +26,27 @@ export interface RomDirs {
 const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * Devolve os arquivos renomeados (caminho antigo → novo).
+ * O que renomear uma ROM moveria, sem mover: cada arquivo dela e o nome
+ * novo. `conflicts` são os que já existem com o nome novo — mover por cima
+ * perderia um deles, então a renomeação inteira para e pede decisão.
  *
  * O padrão é ancorado nos sufixos que o core produz, e não em "começa com a
- * base": `Emerald (2).sav` começa com `Emerald` e não é desta ROM. E nunca
- * sobrescreve — se já existe um arquivo com o nome novo, o antigo fica onde
- * está, intacto.
+ * base": `Emerald (2).sav` começa com `Emerald` e não é desta ROM.
  */
-export function renameRomFiles(
-  fs: FsLike,
-  dirs: RomDirs,
-  fromRom: string,
-  toRom: string
-): [string, string][] {
+export interface RenamePlan {
+  moves: [string, string][];
+  conflicts: string[];
+}
+
+export function planRomFileRename(fs: FsLike, dirs: RomDirs, fromRom: string, toRom: string): RenamePlan {
   const de = romBaseName(fromRom);
   const para = romBaseName(toRom);
-  if (de === para) return [];
+  const plano: RenamePlan = { moves: [], conflicts: [] };
+  if (de === para) return plano;
 
   const sufixo = new RegExp(
     `^${escapar(de)}(\\.sav|\\.ss\\d|_auto\\.ss|\\.ss\\d\\.png|-\\d{8}-\\d{6}\\.png)$`
   );
-  const feitos: [string, string][] = [];
   for (const dir of new Set([dirs.savePath, dirs.saveStatePath, dirs.screenshotsPath])) {
     let nomes: string[];
     try {
@@ -58,15 +59,39 @@ export function renameRomFiles(
       const m = sufixo.exec(nome);
       if (!m) continue;
       const novo = para + m[1];
-      if (existentes.has(novo)) continue;
-      try {
-        fs.rename(`${dir}/${nome}`, `${dir}/${novo}`);
-        existentes.add(novo);
-        feitos.push([`${dir}/${nome}`, `${dir}/${novo}`]);
-      } catch {
-        // um arquivo que não renomeia não impede os outros
-      }
+      if (existentes.has(novo)) plano.conflicts.push(`${dir}/${novo}`);
+      else plano.moves.push([`${dir}/${nome}`, `${dir}/${novo}`]);
     }
   }
-  return feitos;
+  return plano;
 }
+
+/**
+ * Faz as mudanças do plano, tudo ou nada: se um arquivo não renomeia, os que
+ * já foram voltam ao nome antigo e o erro sobe. Se nem voltar der, sobe
+ * `RollbackError` com os que ficaram no nome novo.
+ */
+export function applyRomFileRename(fs: FsLike, moves: readonly [string, string][]): void {
+  const feitos: [string, string][] = [];
+  try {
+    for (const [de, para] of moves) {
+      fs.rename(de, para);
+      feitos.push([de, para]);
+    }
+  } catch (error) {
+    const falhas: string[] = [];
+    for (const [de, para] of feitos.reverse()) {
+      try {
+        fs.rename(para, de);
+      } catch {
+        falhas.push(para);
+      }
+    }
+    if (falhas.length > 0) throw new RollbackError(falhas, error);
+    throw error;
+  }
+}
+
+/** O inverso de um plano aplicado, para desfazer depois. */
+export const reverseMoves = (moves: readonly [string, string][]): [string, string][] =>
+  [...moves].reverse().map(([de, para]) => [para, de]);

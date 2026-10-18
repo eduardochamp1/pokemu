@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { renameRomFiles, type FsLike } from "./romFiles";
 
 const DIRS = { savePath: "/data/saves", saveStatePath: "/data/states", screenshotsPath: "/data/screenshots" };
+import { applyRomFileRename, planRomFileRename, type FsLike } from "./romFiles";
+import { RollbackError } from "../lib/capsule";
+
+/** O jeito antigo de usar: planejar e aplicar, devolvendo o que mudou. */
+function renameRomFiles(fs: FsLike, dirs: typeof DIRS, from: string, to: string): [string, string][] {
+  const plano = planRomFileRename(fs, dirs, from, to);
+  if (plano.conflicts.length > 0) return [];
+  applyRomFileRename(fs, plano.moves);
+  return plano.moves;
+}
+
 
 /** FS falso: um conjunto de caminhos completos. */
 function fakeFs(paths: string[]): FsLike & { paths: Set<string> } {
@@ -53,10 +63,34 @@ describe("renameRomFiles", () => {
     ]);
   });
 
-  it("não sobrescreve um save que já existe com o nome novo", () => {
-    const fs = fakeFs(["/data/saves/Emerald.sav", "/data/saves/Novo.sav"]);
+  it("save que já existe com o nome novo é conflito e nada se move (AUD-07)", () => {
+    const fs = fakeFs(["/data/saves/Emerald.sav", "/data/states/Emerald.ss1", "/data/saves/Novo.sav"]);
+    expect(planRomFileRename(fs, DIRS, "Emerald.gba", "Novo.gba").conflicts).toEqual(["/data/saves/Novo.sav"]);
     expect(renameRomFiles(fs, DIRS, "Emerald.gba", "Novo.gba")).toEqual([]);
     expect(fs.paths.has("/data/saves/Emerald.sav")).toBe(true);
+    expect(fs.paths.has("/data/states/Emerald.ss1")).toBe(true);
+  });
+
+  it("um arquivo que não renomeia faz os outros voltarem (AUD-07)", () => {
+    const fs = fakeFs(["/data/saves/Emerald.sav", "/data/states/Emerald.ss1"]);
+    const renomear = fs.rename;
+    fs.rename = (a, b) => {
+      if (a.endsWith(".ss1")) throw new Error("travado");
+      renomear(a, b);
+    };
+    const plano = planRomFileRename(fs, DIRS, "Emerald.gba", "Novo.gba");
+    expect(() => applyRomFileRename(fs, plano.moves)).toThrow("travado");
+    expect([...fs.paths].sort()).toEqual(["/data/saves/Emerald.sav", "/data/states/Emerald.ss1"]);
+  });
+
+  it("se nem voltar der, avisa com RollbackError", () => {
+    const fs = fakeFs(["/data/saves/Emerald.sav", "/data/states/Emerald.ss1"]);
+    const renomear = fs.rename;
+    fs.rename = (a, b) => {
+      if (a.endsWith(".ss1") || a.endsWith("Novo.sav")) throw new Error("travado");
+      renomear(a, b);
+    };
+    expect(() => applyRomFileRename(fs, planRomFileRename(fs, DIRS, "Emerald.gba", "Novo.gba").moves)).toThrow(RollbackError);
   });
 
   it("nome com caracteres de regex é tratado como texto", () => {

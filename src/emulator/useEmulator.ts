@@ -825,7 +825,7 @@ export function useEmulator() {
       // Antes do loadGame: se este arquivo é um já conhecido com outro nome,
       // o save de bateria precisa estar com o nome novo quando o core o
       // procurar.
-      const nomeAntigo = await registerLoadedRom(
+      const registro = await registerLoadedRom(
         core,
         flatName,
         await flatFile.arrayBuffer(),
@@ -833,6 +833,33 @@ export function useEmulator() {
         source,
         localRomsRef.current?.map((r) => r.fileName) ?? null
       );
+      if (registro.kind === "blocked") {
+        // A cópia nova sai do core: aberta pela biblioteca, ela jogaria sem o
+        // save que ficou no nome antigo.
+        try {
+          core.FS.unlink(`${core.filePaths().gamePath}/${flatName}`);
+        } catch {
+          // não chegou a ficar
+        }
+        await syncFs(core);
+        falhaAoCarregar(
+          anterior,
+          registro.reason === "conflict"
+            ? tr(
+                getLang(),
+                `${flatName} é o mesmo arquivo que ${registro.from}, mas já existem dados com o nome novo. Para não misturar as duas aventuras, nada foi movido: volte o arquivo para "${registro.from}" ou exporte a cápsula de um dos nomes antes.`,
+                `${flatName} is the same file as ${registro.from}, but data already exists under the new name. To avoid mixing the two adventures, nothing was moved: rename the file back to "${registro.from}" or export one name's capsule first.`
+              )
+            : tr(
+                getLang(),
+                `Não deu para levar o save de ${registro.from} para ${flatName}; tudo ficou como estava. ${dicaDeCota()}`,
+                `Couldn't move the save from ${registro.from} to ${flatName}; everything stayed as it was. ${dicaDeCota()}`
+              )
+        );
+        refreshLibrary();
+        return;
+      }
+      const nomeAntigo = registro.kind === "renamed" ? registro.from : undefined;
       if (nomeAntigo) await syncFs(core);
 
       const ok = core.loadGame(`${core.filePaths().gamePath}/${flatName}`);

@@ -1,9 +1,18 @@
 import type { mGBAEmulator } from "./types";
 import { isSupportedRom } from "./types";
-import { renameRomFiles, type FsLike } from "./romFiles";
-import { loadRegistry, registerRom, sha256Hex, type RomSource } from "../lib/romIdentity";
-import { renameGuideText } from "../lib/guideStore";
-import { renameBranches } from "../lib/branches";
+import { applyRomFileRename, planRomFileRename, reverseMoves, type FsLike } from "./romFiles";
+import {
+  commitRegistration,
+  loadRegistry,
+  registerRom,
+  renameRomData,
+  resolveRegistration,
+  romDataConflicts,
+  sha256Hex,
+  type RomSource,
+} from "../lib/romIdentity";
+import { readGuideText, renameGuideText } from "../lib/guideStore";
+import { listBranches, renameBranches } from "../lib/branches";
 import { reloadLegacyAdventures } from "../lib/legacyAdventures";
 import { reloadPersonalAdventures } from "../lib/personalAdventures";
 import { reloadPlayerDex } from "../lib/playerDex";
@@ -42,15 +51,33 @@ function presentNames(
   return present;
 }
 
+export type Registration =
+  | { kind: "none" }
+  /** Era um arquivo conhecido com outro nome: tudo foi junto. */
+  | { kind: "renamed"; from: string }
+  /**
+   * Era uma renomeação, mas não deu para levar tudo: nada mudou de lugar e o
+   * índice continua no nome antigo. `conflict` = o nome novo já tem dados;
+   * `failed` = uma gravação falhou e foi desfeita.
+   */
+  | { kind: "blocked"; from: string; reason: "conflict" | "failed"; items: string[] };
+
 /**
  * Registra a ROM que acabou de entrar no FS. Se for um arquivo já conhecido
- * com outro nome, leva junto os dados e os arquivos do core, e devolve o nome
- * antigo.
+ * com outro nome, leva junto os arquivos do core, os registros, o detonado e
+ * as ramificações.
  *
  * Tem que rodar **antes** do `loadGame`: é no carregamento que o core procura
  * o save de bateria pelo nome da ROM.
  *
- * Nunca lança: falhar em registrar não pode impedir ninguém de jogar.
+ * A renomeação é uma migração: primeiro confere tudo (nada pode ser
+ * sobrescrito), depois move arquivos, registros, detonado e ramificações, e só
+ * no fim, com os arquivos sincronizados, grava o índice com o nome novo. Uma falha no meio desfaz o que foi
+ * feito; uma interrupção deixa o índice no nome antigo, e a próxima abertura
+ * reconhece a renomeação de novo e termina — cada passo pula o que já foi.
+ *
+ * Fora a renomeação bloqueada, nunca impede ninguém de jogar: falhar em
+ * registrar só deixa a ROM sem identidade até a próxima vez.
  */
 export async function registerLoadedRom(
   core: mGBAEmulator,
@@ -59,34 +86,87 @@ export async function registerLoadedRom(
   size: number,
   source: RomSource,
   folderNames: string[] | null
-): Promise<string | undefined> {
+): Promise<Registration> {
+  let res: ReturnType<typeof resolveRegistration>;
   try {
     const hash = await sha256Hex(bytes);
-    const present = presentNames(core, folderNames, rom);
-    const { renamedFrom } = registerRom(localStorage, rom, hash, size, present, source);
-    if (!renamedFrom) return undefined;
-
-    renameRomFiles(core.FS as unknown as FsLike, core.filePaths(), renamedFrom, rom);
-    // A cópia antiga da ROM é o mesmo conteúdo, e o arquivo de origem não
-    // existe mais com aquele nome: deixá-la mostraria o jogo duas vezes.
-    try {
-      core.FS.unlink(`${core.filePaths().gamePath}/${renamedFrom}`);
-    } catch {
-      // já não estava lá
+    res = resolveRegistration(localStorage, rom, hash, size, presentNames(core, folderNames, rom), source);
+    if (!res.renamedFrom) {
+      commitRegistration(localStorage, res);
+      return { kind: "none" };
     }
-    await renameGuideText(renamedFrom, rom).catch(() => undefined);
-    await renameBranches(renamedFrom, rom).catch(() => undefined);
-    reloadPersonalAdventures();
-    reloadLegacyAdventures();
-    reloadTrainerLog();
-    reloadPlayerDex();
-    reloadSessions();
-    reloadChallenges();
-    reloadMapMarks();
-    return renamedFrom;
   } catch {
-    return undefined;
+    return { kind: "none" };
   }
+
+  const from = res.renamedFrom;
+  const fs = core.FS as unknown as FsLike;
+  const plano = planRomFileRename(fs, core.filePaths(), from, rom);
+  try {
+    // Conferência: nada muda se qualquer parte já existir no nome novo.
+    const conflitos = [
+      ...plano.conflicts,
+      ...romDataConflicts(localStorage, from, rom),
+      ...((await readGuideText(from)) !== null && (await readGuideText(rom)) !== null ? ["guide"] : []),
+      ...((await listBranches(from)).length > 0 && (await listBranches(rom)).length > 0 ? ["branches"] : []),
+    ];
+    if (conflitos.length > 0) return { kind: "blocked", from, reason: "conflict", items: conflitos };
+  } catch {
+    return { kind: "blocked", from, reason: "failed", items: ["prepare"] };
+  }
+
+  const desfazer: (() => Promise<void> | void)[] = [];
+  let etapa = "files";
+  try {
+    applyRomFileRename(fs, plano.moves);
+    desfazer.push(() => applyRomFileRename(fs, reverseMoves(plano.moves)));
+    etapa = "data";
+    const movidas = renameRomData(localStorage, from, rom);
+    if (movidas.length > 0) desfazer.push(() => void renameRomData(localStorage, rom, from));
+    etapa = "guide";
+    await renameGuideText(from, rom);
+    desfazer.push(() => renameGuideText(rom, from));
+    etapa = "branches";
+    desfazer.push(() => renameBranches(rom, from));
+    await renameBranches(from, rom);
+    // Os arquivos no disco antes do índice: se o índice fosse para o nome
+    // novo e a aba fechasse antes da sincronização, o save ficaria no nome
+    // antigo sem nada que o reconhecesse.
+    etapa = "sync";
+    await core.FSSync();
+    etapa = "registry";
+    commitRegistration(localStorage, res);
+  } catch {
+    for (const passo of desfazer.reverse()) {
+      try {
+        await passo();
+      } catch {
+        // o índice continua no nome antigo: a próxima abertura termina
+      }
+    }
+    recarregarStores();
+    return { kind: "blocked", from, reason: "failed", items: [etapa] };
+  }
+
+  // A cópia antiga da ROM é o mesmo conteúdo, e o arquivo de origem não
+  // existe mais com aquele nome: deixá-la mostraria o jogo duas vezes.
+  try {
+    core.FS.unlink(`${core.filePaths().gamePath}/${from}`);
+  } catch {
+    // já não estava lá
+  }
+  recarregarStores();
+  return { kind: "renamed", from };
+}
+
+function recarregarStores(): void {
+  reloadPersonalAdventures();
+  reloadLegacyAdventures();
+  reloadTrainerLog();
+  reloadPlayerDex();
+  reloadSessions();
+  reloadChallenges();
+  reloadMapMarks();
 }
 
 /**

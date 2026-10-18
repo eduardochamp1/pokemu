@@ -28,6 +28,7 @@ function fakeCore(files: Record<string, Uint8Array>) {
   const core = {
     filePaths: () => PATHS,
     listRoms: () => dir(PATHS.gamePath),
+    FSSync: async () => undefined,
     FS: {
       readdir: (d: string) => [".", "..", ...dir(d)],
       readFile: (p: string) => {
@@ -61,12 +62,12 @@ describe("registerLoadedRom", () => {
     });
     memory["pokedex:personal-adventures"] = JSON.stringify([{ rom: "Emerald.gba", favorite: true }]);
 
-    expect(await registerLoadedRom(core, "Emerald.gba", ROM, 4, "folder", ["Emerald.gba"])).toBeUndefined();
+    expect(await registerLoadedRom(core, "Emerald.gba", ROM, 4, "folder", ["Emerald.gba"])).toEqual({ kind: "none" });
     const id = registro()["Emerald.gba"].adventureId;
 
     // No disco o arquivo virou Esmeralda.gba; o core acabou de receber a cópia nova.
     fs.set("/data/games/Esmeralda.gba", ROM);
-    expect(await registerLoadedRom(core, "Esmeralda.gba", ROM, 4, "folder", ["Esmeralda.gba"])).toBe("Emerald.gba");
+    expect(await registerLoadedRom(core, "Esmeralda.gba", ROM, 4, "folder", ["Esmeralda.gba"])).toEqual({ kind: "renamed", from: "Emerald.gba" });
 
     expect([...fs.keys()].sort()).toEqual([
       "/data/games/Esmeralda.gba",
@@ -82,7 +83,7 @@ describe("registerLoadedRom", () => {
     const { core, fs } = fakeCore({ "/data/games/a.gba": ROM, "/data/saves/a.sav": new Uint8Array([9]) });
     await registerLoadedRom(core, "a.gba", ROM, 4, "upload", null);
     fs.set("/data/games/b.gba", ROM);
-    expect(await registerLoadedRom(core, "b.gba", ROM, 4, "upload", null)).toBeUndefined();
+    expect(await registerLoadedRom(core, "b.gba", ROM, 4, "upload", null)).toEqual({ kind: "none" });
     expect(fs.has("/data/saves/a.sav")).toBe(true);
     expect(registro()["a.gba"].adventureId).not.toBe(registro()["b.gba"].adventureId);
   });
@@ -97,8 +98,71 @@ describe("registerLoadedRom", () => {
       },
     } as unknown as Storage);
     const { core, fs } = fakeCore({ "/data/games/a.gba": ROM, "/data/saves/a.sav": new Uint8Array([9]) });
-    expect(await registerLoadedRom(core, "a.gba", ROM, 4, "upload", null)).toBeUndefined();
+    expect(await registerLoadedRom(core, "a.gba", ROM, 4, "upload", null)).toEqual({ kind: "none" });
     expect(fs.has("/data/saves/a.sav")).toBe(true);
+  });
+});
+
+describe("renomeação como migração (AUD-07)", () => {
+  async function conhecida(extra: Record<string, Uint8Array> = {}) {
+    const f = fakeCore({
+      "/data/games/Emerald.gba": ROM,
+      "/data/saves/Emerald.sav": new Uint8Array([9]),
+      "/data/states/Emerald.ss1": new Uint8Array([8]),
+      ...extra,
+    });
+    memory["pokedex:trainer-log"] = JSON.stringify({ "Emerald.gba": { rom: "Emerald.gba", n: 1 } });
+    await registerLoadedRom(f.core, "Emerald.gba", ROM, 4, "folder", ["Emerald.gba"]);
+    f.fs.set("/data/games/Novo.gba", ROM);
+    return f;
+  }
+
+  it("nome novo que já tem save: bloqueia sem mover nada e o índice fica no nome antigo", async () => {
+    const { core, fs } = await conhecida({ "/data/saves/Novo.sav": new Uint8Array([1]) });
+    const r = await registerLoadedRom(core, "Novo.gba", ROM, 4, "folder", ["Novo.gba"]);
+    expect(r).toEqual({ kind: "blocked", from: "Emerald.gba", reason: "conflict", items: ["/data/saves/Novo.sav"] });
+    expect(fs.has("/data/saves/Emerald.sav")).toBe(true);
+    expect(fs.has("/data/states/Emerald.ss1")).toBe(true);
+    expect(Object.keys(registro())).toEqual(["Emerald.gba"]);
+    expect(Object.keys(JSON.parse(memory["pokedex:trainer-log"]))).toEqual(["Emerald.gba"]);
+  });
+
+  it("falha ao gravar os registros desfaz os arquivos; tentar de novo conclui", async () => {
+    const { core, fs } = await conhecida();
+    const gravar = localStorage.setItem;
+    let falhar = true;
+    vi.stubGlobal("localStorage", {
+      getItem: (k: string) => (k in memory ? memory[k] : null),
+      setItem: (k: string, v: string) => {
+        if (falhar && k === "pokedex:trainer-log") throw new Error("cota");
+        gravar(k, v);
+      },
+    } as unknown as Storage);
+    const r = await registerLoadedRom(core, "Novo.gba", ROM, 4, "folder", ["Novo.gba"]);
+    expect(r).toEqual({ kind: "blocked", from: "Emerald.gba", reason: "failed", items: ["data"] });
+    expect(fs.has("/data/saves/Emerald.sav")).toBe(true);
+    expect(fs.has("/data/saves/Novo.sav")).toBe(false);
+    expect(Object.keys(registro())).toEqual(["Emerald.gba"]);
+
+    falhar = false;
+    expect(await registerLoadedRom(core, "Novo.gba", ROM, 4, "folder", ["Novo.gba"])).toEqual({ kind: "renamed", from: "Emerald.gba" });
+    expect(fs.has("/data/saves/Novo.sav")).toBe(true);
+    expect(Object.keys(registro())).toEqual(["Novo.gba"]);
+  });
+
+  it("interrompida depois de mover os registros: a próxima abertura termina sem duplicar", async () => {
+    const { core, fs } = await conhecida();
+    // Como ficaria depois de uma queda: os registros já no nome novo
+    // (localStorage é imediato), os arquivos ainda no antigo (o FS não
+    // sincronizou) e o índice no antigo.
+    memory["pokedex:trainer-log"] = JSON.stringify({ "Novo.gba": { rom: "Novo.gba", n: 1 } });
+    expect(await registerLoadedRom(core, "Novo.gba", ROM, 4, "folder", ["Novo.gba"])).toEqual({ kind: "renamed", from: "Emerald.gba" });
+    expect([...fs.keys()].sort()).toEqual(["/data/games/Novo.gba", "/data/saves/Novo.sav", "/data/states/Novo.ss1"]);
+    expect(JSON.parse(memory["pokedex:trainer-log"])).toEqual({ "Novo.gba": { rom: "Novo.gba", n: 1 } });
+    // Abrir de novo não muda nada: migrar duas vezes dá o mesmo resultado.
+    const antes = JSON.stringify(memory);
+    expect(await registerLoadedRom(core, "Novo.gba", ROM, 4, "folder", ["Novo.gba"])).toEqual({ kind: "none" });
+    expect(JSON.stringify(memory)).toBe(antes);
   });
 });
 
