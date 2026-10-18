@@ -138,6 +138,13 @@ const DataPage = () => {
         )}
       </p>
       <p className="page-scope">{t("Para guardar o progresso jogável, exporte também o save .sav na área de jogo.", "To keep playable progress, also export the .sav save from the game workspace.")}{" "}<Link to="/?area=jogar&painel=saves">{t("Abrir saves →", "Open saves →")}</Link></p>
+      {/* O que cada exportação leva: antes de limpar o navegador ou trocar de
+          perfil, a pessoa precisa saber que as ramificações não vão aqui. */}
+      <ul className="page-scope">
+        <li>{t("Este backup: fichas, diário, desafios, marcações, preferências e detonados de todos os jogos.", "This backup: cards, journal, challenges, marks, preferences and walkthroughs for every game.")}</li>
+        <li>{t("Cápsula (área de jogo › Saves): uma aventura jogável — save, pontos de retorno, capturas e os dados dela.", "Capsule (game workspace › Saves): one playable adventure — save, save states, screenshots and its data.")}</li>
+        <li><strong>{t("Ramificações não entram em nenhum dos dois:", "Branches aren't in either:")}</strong> {t("exporte cada uma em Saves › Ramificações › Exportar, e importe no outro navegador pelo mesmo painel.", "export each one in Saves › Branches › Export, and import it in the other browser from the same panel.")}</li>
+      </ul>
       {erro && <p className="dados-erro" role="alert">{erro}</p>}
 
       <section className="dados-bloco" aria-labelledby="dados-exportar">

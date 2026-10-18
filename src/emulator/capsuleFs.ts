@@ -66,7 +66,13 @@ export function existingSuffixes(fs: CapsuleFs, dirs: CapsuleDirs, rom: string):
  * listado que não dá para ler derruba a coleta com `CapsuleIncompleteError`:
  * uma cápsula sem o save não pode sair parecendo completa.
  */
-export async function collectRomFiles(fs: CapsuleFs, dirs: CapsuleDirs, rom: string): Promise<CapsuleFile[]> {
+export async function collectRomFiles(
+  fs: CapsuleFs,
+  dirs: CapsuleDirs,
+  rom: string,
+  /** Sem as capturas de tela: as ramificações não as levam. */
+  opts: { screenshots?: boolean } = {}
+): Promise<CapsuleFile[]> {
   const base = romBaseName(rom);
   const out: CapsuleFile[] = [];
   const vistos = new Set<string>();
@@ -74,6 +80,7 @@ export async function collectRomFiles(fs: CapsuleFs, dirs: CapsuleDirs, rom: str
   for (const t of TIPOS) {
     for (const suffix of sufixosEm(fs, dirs[t.dir], base)) {
       if (!t.re.test(suffix) || vistos.has(suffix)) continue;
+      if (opts.screenshots === false && t.kind === "screenshot") continue;
       vistos.add(suffix);
       try {
         out.push(await capsuleFile(t.kind, suffix, fs.readFile(`${dirs[t.dir]}/${base}${suffix}`)));

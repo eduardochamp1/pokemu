@@ -19,11 +19,16 @@ const fsDe = (core: mGBAEmulator) => core.FS as unknown as CapsuleFs;
  * arquivo, o detonado ou um registro —, rejeita com `CapsuleIncompleteError`
  * dizendo o quê, em vez de entregar uma cápsula com buracos.
  */
-export async function buildCapsule(core: mGBAEmulator, rom: string): Promise<Capsule> {
+export async function buildCapsule(
+  core: mGBAEmulator,
+  rom: string,
+  /** `branch`: sem capturas de tela, que ficam em todas as ramificações. */
+  purpose: "export" | "branch" = "export"
+): Promise<Capsule> {
   const faltas: string[] = [];
   let files: Capsule["files"] = [];
   try {
-    files = await collectRomFiles(fsDe(core), core.filePaths(), rom);
+    files = await collectRomFiles(fsDe(core), core.filePaths(), rom, { screenshots: purpose === "export" });
   } catch (error) {
     if (!(error instanceof CapsuleIncompleteError)) throw error;
     faltas.push(...error.items);

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  BRANCH_BYTES_PER_ROM,
+  BranchBudgetError,
+  branchFileName,
+  branchesToPrune,
   branchSummary,
   deleteBranch,
   listBranches,
@@ -92,5 +96,49 @@ describe("branchSummary", () => {
 
   it("ficha com forma inesperada não lança", () => {
     expect(() => branchSummary(capsula({ "pokedex:trainer-log": { trainer: "x", team: [null, 5] } }))).not.toThrow();
+  });
+});
+
+describe("política de espaço (AUD-15)", () => {
+  const pesada = (bytes: number): Capsule => ({ ...capsula(), guide: "x".repeat(bytes) });
+
+  it("100 trocas: ficam as 5 automáticas mais novas, e as manuais intactas", async () => {
+    await saveBranch(newBranch("a.gba", "Minha", capsula(), false, 1, "manual"));
+    for (let i = 0; i < 100; i++) await saveBranch(newBranch("a.gba", `auto ${i}`, capsula(), true, 10 + i, `auto-${i}`));
+    const lista = await listBranches("a.gba");
+    expect(lista.filter((b) => b.automatic).map((b) => b.name)).toEqual(["auto 99", "auto 98", "auto 97", "auto 96", "auto 95"]);
+    expect(lista.filter((b) => !b.automatic).map((b) => b.id)).toEqual(["manual"]);
+  });
+
+  it("passando do orçamento, saem as automáticas mais antigas — nunca a recém-guardada", () => {
+    const grande = Math.floor(BRANCH_BYTES_PER_ROM / 3.5);
+    const lista = [
+      newBranch("a.gba", "m", pesada(grande), false, 1, "m"),
+      newBranch("a.gba", "a1", pesada(grande), true, 2, "a1"),
+      newBranch("a.gba", "a2", pesada(grande), true, 3, "a2"),
+      newBranch("a.gba", "nova", pesada(grande), true, 4, "nova"),
+    ];
+    expect(branchesToPrune(lista, "nova").map((b) => b.id)).toEqual(["a1"]);
+  });
+
+  it("manual que não cabe é recusada antes de gravar, e nada some", async () => {
+    await saveBranch(newBranch("a.gba", "m1", pesada(BRANCH_BYTES_PER_ROM * 0.6), false, 1, "m1"));
+    await expect(saveBranch(newBranch("a.gba", "m2", pesada(BRANCH_BYTES_PER_ROM * 0.6), false, 2, "m2"))).rejects.toBeInstanceOf(
+      BranchBudgetError
+    );
+    expect((await listBranches("a.gba")).map((b) => b.id)).toEqual(["m1"]);
+  });
+
+  it("outro jogo não entra na conta", async () => {
+    for (let i = 0; i < 8; i++) await saveBranch(newBranch("b.gba", `b ${i}`, capsula(), true, i, `b-${i}`));
+    await saveBranch(newBranch("a.gba", "a", capsula(), true, 100, "a"));
+    expect(await listBranches("a.gba")).toHaveLength(1);
+    expect(await listBranches("b.gba")).toHaveLength(5);
+  });
+
+  it("nome do arquivo exportado leva jogo, nome e data, sem caractere proibido", () => {
+    expect(branchFileName({ rom: "Emerald.gba", name: "Antes/da: Elite", createdAt: new Date(2026, 9, 12).getTime() })).toBe(
+      "Emerald - Antes-da- Elite - 2026-10-12.pokemu.json"
+    );
   });
 });

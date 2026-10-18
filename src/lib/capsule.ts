@@ -40,6 +40,8 @@ export interface Capsule {
   data: Record<string, unknown>;
   /** Texto do detonado, quando há. */
   guide?: string;
+  /** Presente quando o arquivo é uma ramificação exportada: o nome e a data dela. */
+  branch?: { name: string; createdAt: number; automatic?: boolean };
 }
 
 /** Teto do arquivo inteiro. Um save tem 128 kB; um estado, algumas centenas. */
@@ -113,6 +115,19 @@ export class RollbackError extends Error {
   }
 }
 
+function ramoValido(v: unknown): boolean {
+  const b = v as Record<string, unknown> | null;
+  return (
+    !!b &&
+    typeof b === "object" &&
+    typeof b.name === "string" &&
+    b.name.length <= 60 &&
+    typeof b.createdAt === "number" &&
+    Number.isFinite(b.createdAt) &&
+    (b.automatic === undefined || typeof b.automatic === "boolean")
+  );
+}
+
 export type ParseResult =
   | { ok: true; capsule: Capsule }
   | { ok: false; reason: "format" | "version" | "corrupt" | "too-large" };
@@ -146,7 +161,8 @@ export async function parseCapsule(text: string): Promise<ParseResult> {
     !c.data ||
     typeof c.data !== "object" ||
     Array.isArray(c.data) ||
-    (c.guide !== undefined && (typeof c.guide !== "string" || c.guide.length > 300_000))
+    (c.guide !== undefined && (typeof c.guide !== "string" || c.guide.length > 300_000)) ||
+    (c.branch !== undefined && !ramoValido(c.branch))
   ) {
     return { ok: false, reason: "format" };
   }
