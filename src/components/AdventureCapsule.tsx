@@ -11,6 +11,7 @@ import {
 import { loadRegistry } from "../lib/romIdentity";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
+import { incompleteMessage, restoreFailureMessage } from "./capsuleMessages";
 
 interface Props {
   /** As ROMs que têm arquivos no navegador. */
@@ -66,8 +67,8 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
               "Capsule exported, but without a battery save: this game hasn't saved in-game yet."
             )
       );
-    } catch {
-      setAviso(t("Não foi possível montar a cápsula.", "Could not build the capsule."));
+    } catch (error) {
+      setAviso(incompleteMessage(lang, error) ?? t("Não foi possível montar a cápsula.", "Could not build the capsule."));
     } finally {
       setOcupado(false);
     }
@@ -121,13 +122,9 @@ export default function AdventureCapsule({ roms, currentRom, onRestored }: Props
       onRestored();
       setPendente(null);
       setAviso(t(`Aventura de ${adventureLabel(target)} restaurada.`, `${adventureLabel(target)} adventure restored.`));
-    } catch {
-      setAviso(
-        t(
-          "A restauração falhou e foi desfeita: a aventura está como antes. Verifique o espaço disponível.",
-          "The restore failed and was undone: the adventure is as it was. Check available storage."
-        )
-      );
+    } catch (error) {
+      onRestored();
+      setAviso(restoreFailureMessage(lang, error));
     } finally {
       setOcupado(false);
     }

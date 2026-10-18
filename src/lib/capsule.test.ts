@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   applyRomData,
   capsuleFile,
+  CapsuleIncompleteError,
   capsuleFileName,
   collectRomData,
   fromBase64,
   parseCapsule,
   planRestore,
+  RollbackError,
   toBase64,
   type Capsule,
 } from "./capsule";
@@ -74,6 +76,33 @@ describe("parseCapsule", () => {
   });
 });
 
+describe("tipo derivado do sufixo (AUD-04)", () => {
+  const SUFIXOS = { save: ".sav", state: ".ss1", thumbnail: ".ss1.png", screenshot: "-20261012-101500.png" } as const;
+  const tipos = Object.keys(SUFIXOS) as (keyof typeof SUFIXOS)[];
+  for (const kind of tipos) {
+    for (const suffixDe of tipos) {
+      if (kind === suffixDe) continue;
+      it(`recusa kind ${kind} com sufixo de ${suffixDe}`, async () => {
+        const c = await capsula({ files: [await capsuleFile(kind, SUFIXOS[suffixDe], new Uint8Array([9]))] });
+        expect(await parseCapsule(JSON.stringify(c))).toEqual({ ok: false, reason: "format" });
+      });
+    }
+  }
+
+  it("estado de outro core não passa como save de bateria", async () => {
+    const forjado = await capsula({ files: [await capsuleFile("save", ".ss1", new Uint8Array([9]))] });
+    // Mesmo que chegue ao planejador, o tipo vem do sufixo.
+    expect(planRestore(forjado, new Set(), "outro core")[0].action).toBe("skip-core");
+  });
+
+  it("cada tipo com o sufixo certo continua aceito", async () => {
+    const c = await capsula({
+      files: await Promise.all(tipos.map((k) => capsuleFile(k, SUFIXOS[k], new Uint8Array([1])))),
+    });
+    expect((await parseCapsule(JSON.stringify(c))).ok).toBe(true);
+  });
+});
+
 describe("planRestore", () => {
   it("mesmo core: tudo volta, e marca o que substitui", async () => {
     const plano = planRestore(await capsula(), new Set([".sav"]), "mGBA 1");
@@ -104,6 +133,9 @@ function storage(initial: Record<string, string> = {}) {
     getItem: (k: string) => (k in data ? data[k] : null),
     setItem: (k: string, v: string) => {
       data[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete data[k];
     },
   };
 }
@@ -140,7 +172,7 @@ describe("dados da ROM", () => {
     const s = storage(inicial);
     let gravacoes = 0;
     const falha = {
-      getItem: s.getItem,
+      ...s,
       setItem: (k: string, v: string) => {
         if (++gravacoes === 2) throw new Error("cota");
         s.setItem(k, v);
@@ -153,6 +185,107 @@ describe("dados da ROM", () => {
       })
     ).toThrow("cota");
     expect(s.data).toEqual(inicial);
+  });
+});
+
+describe("rollback dos dados da ROM (AUD-02)", () => {
+  const CHAVES = ["pokedex:personal-adventures", "pokedex:trainer-log", "pokedex:challenges"] as const;
+  const dados = {
+    "pokedex:personal-adventures": { title: "nova" },
+    "pokedex:trainer-log": { n: 1 },
+    "pokedex:challenges": { rules: [] },
+  };
+  const outra = {
+    "pokedex:personal-adventures": JSON.stringify([{ rom: "b.gba" }]),
+    "pokedex:trainer-log": JSON.stringify({ "b.gba": { rom: "b.gba" } }),
+    "pokedex:challenges": JSON.stringify({ "b.gba": { rom: "b.gba" } }),
+  };
+
+  // Cada chave ausente ou presente, com a falha em cada uma das gravações.
+  for (let mascara = 0; mascara < 8; mascara++) {
+    for (let falhaEm = 1; falhaEm <= 3; falhaEm++) {
+      const presentes = CHAVES.filter((_, i) => mascara & (1 << i));
+      it(`presentes [${presentes.join(", ") || "nenhuma"}], falha na gravação ${falhaEm}: volta ao inicial`, () => {
+        const inicial = Object.fromEntries(presentes.map((k) => [k, outra[k]]));
+        const s = storage(inicial);
+        let n = 0;
+        const falha = {
+          ...s,
+          setItem: (k: string, v: string) => {
+            if (++n === falhaEm) throw new Error("cota");
+            s.setItem(k, v);
+          },
+        };
+        expect(() => applyRomData(falha, "a.gba", dados)).toThrow("cota");
+        expect(s.data).toEqual(inicial);
+      });
+    }
+  }
+
+  it("chave que não existia é removida, não deixada com a entrada nova", () => {
+    const s = storage();
+    const falha = {
+      ...s,
+      setItem: (k: string, v: string) => {
+        if (k === "pokedex:legacy-adventures") throw new Error("cota");
+        s.setItem(k, v);
+      },
+    };
+    expect(() =>
+      applyRomData(falha, "demo.gba", {
+        "pokedex:personal-adventures": { title: "nova" },
+        "pokedex:legacy-adventures": { title: "nova" },
+      })
+    ).toThrow("cota");
+    expect("pokedex:personal-adventures" in s.data).toBe(false);
+  });
+
+  it("se desfazer também falha, diz quais chaves ficaram", () => {
+    const s = storage();
+    const falha = {
+      ...s,
+      setItem: (k: string, v: string) => {
+        if (k === "pokedex:trainer-log") throw new Error("cota");
+        s.setItem(k, v);
+      },
+      removeItem: () => {
+        throw new Error("travado");
+      },
+    };
+    let erro: unknown;
+    try {
+      applyRomData(falha, "a.gba", dados);
+    } catch (e) {
+      erro = e;
+    }
+    expect(erro).toBeInstanceOf(RollbackError);
+    expect((erro as RollbackError).failed).toEqual(["pokedex:personal-adventures"]);
+    expect(((erro as RollbackError).cause as Error).message).toBe("cota");
+  });
+
+  it("registro existente ilegível recusa antes de gravar e não apaga as outras aventuras", () => {
+    const inicial = { "pokedex:personal-adventures": JSON.stringify([{ rom: "b.gba" }]), "pokedex:trainer-log": "{quebrado" };
+    const s = storage(inicial);
+    expect(() => applyRomData(s, "a.gba", dados)).toThrow("registro ilegível");
+    expect(s.data).toEqual(inicial);
+  });
+});
+
+describe("collectRomData com registro quebrado (AUD-05)", () => {
+  it("reporta o registro em vez de sumir com ele", () => {
+    const problemas: string[] = [];
+    const s = storage({
+      "pokedex:trainer-log": "{quebrado",
+      "pokedex:challenges": JSON.stringify([1]),
+      "pokedex:sessions": JSON.stringify({ "a.gba": { rom: "a.gba" } }),
+    });
+    expect(collectRomData(s, "a.gba", problemas)).toEqual({ "pokedex:sessions": { rom: "a.gba" } });
+    expect(problemas.sort()).toEqual(["pokedex:challenges", "pokedex:trainer-log"]);
+  });
+
+  it("o erro de incompleta leva os itens", () => {
+    const e = new CapsuleIncompleteError([".sav", "guide"]);
+    expect(e.items).toEqual([".sav", "guide"]);
   });
 });
 

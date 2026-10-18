@@ -12,6 +12,7 @@ import {
 } from "../lib/branches";
 import { adventureLabel } from "../lib/activeAdventure";
 import { localeOf, tr, useLang } from "../i18n/lang";
+import { incompleteMessage, restoreFailureMessage } from "./capsuleMessages";
 
 interface Props {
   roms: string[];
@@ -73,8 +74,8 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
       setNome("");
       await recarregar();
       setAviso(t("Ramificação guardada.", "Branch saved."));
-    } catch {
-      setAviso(t("Não foi possível guardar a ramificação. Verifique o espaço do navegador.", "Couldn't save the branch. Check browser storage."));
+    } catch (error) {
+      setAviso(incompleteMessage(lang, error) ?? t("Não foi possível guardar a ramificação. Verifique o espaço do navegador.", "Couldn't save the branch. Check browser storage."));
     } finally {
       setOcupado(false);
     }
@@ -88,6 +89,7 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
     }
     setOcupado(true);
     setAviso(null);
+    let restaurando = false;
     try {
       const core = await getCore();
       // Primeiro o que está em uso agora vira uma ramificação: só depois de
@@ -96,12 +98,21 @@ export default function AdventureBranches({ roms, currentRom, onRestored }: Prop
       if (atual.files.length > 0) {
         await saveBranch(newBranch(rom, t(`Antes de voltar a "${b.name}"`, `Before returning to "${b.name}"`), atual, true));
       }
+      restaurando = true;
       await restoreCapsule(core, b.capsule, rom, planFor(core, b.capsule, rom), true);
       onRestored();
       await recarregar();
       setAviso(t(`A aventura voltou para "${b.name}". O estado anterior ficou guardado na lista.`, `The adventure is back at "${b.name}". The previous state was kept in the list.`));
-    } catch {
-      setAviso(t("A troca falhou e foi desfeita: a aventura está como antes.", "The switch failed and was undone: the adventure is as it was."));
+    } catch (error) {
+      if (restaurando) {
+        onRestored();
+        setAviso(restoreFailureMessage(lang, error));
+      } else {
+        setAviso(
+          incompleteMessage(lang, error) ??
+            t("A troca não começou: a aventura não foi alterada. Verifique o espaço do navegador.", "The switch didn't start: the adventure wasn't changed. Check browser storage.")
+        );
+      }
       await recarregar();
     } finally {
       setOcupado(false);

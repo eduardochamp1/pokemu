@@ -71,9 +71,47 @@ export async function capsuleFile(
   return { kind, suffix, size: copy.length, sha256: await sha256Hex(copy), base64: toBase64(copy) };
 }
 
-const KINDS: readonly string[] = ["save", "state", "thumbnail", "screenshot"];
-/** Os sufixos que o core produz; nada fora disso é escrito no FS. */
-const SUFFIX = /^(\.sav|\.ss\d|_auto\.ss|\.ss\d\.png|-\d{8}-\d{6}\.png)$/;
+/**
+ * Os sufixos que o core produz e o tipo de cada um; nada fora disso é escrito
+ * no FS. É a única tabela: o manifesto, a prévia e o escritor derivam o tipo
+ * daqui, então um `kind` que não bate com o sufixo é recusado na leitura.
+ * A ordem importa: `.ssN.png` antes de `.ssN`.
+ */
+export const SUFFIX_KINDS: readonly { re: RegExp; kind: CapsuleFileKind }[] = [
+  { re: /^\.sav$/, kind: "save" },
+  { re: /^\.ss\d\.png$/, kind: "thumbnail" },
+  { re: /^-\d{8}-\d{6}\.png$/, kind: "screenshot" },
+  { re: /^(\.ss\d|_auto\.ss)$/, kind: "state" },
+];
+
+export function kindOfSuffix(suffix: string): CapsuleFileKind | undefined {
+  return SUFFIX_KINDS.find((t) => t.re.test(suffix))?.kind;
+}
+
+/**
+ * A exportação não conseguiu ler tudo o que existe da aventura. `items` diz o
+ * quê: o sufixo do arquivo, `guide` ou a chave do registro.
+ */
+export class CapsuleIncompleteError extends Error {
+  constructor(readonly items: string[]) {
+    super(`cápsula incompleta: ${items.join(", ")}`);
+    this.name = "CapsuleIncompleteError";
+  }
+}
+
+/**
+ * Uma operação falhou e desfazê-la também falhou: o estado não é mais o de
+ * antes. `failed` diz o que ficou sem reverter; `cause` é o erro original.
+ */
+export class RollbackError extends Error {
+  constructor(
+    readonly failed: string[],
+    cause: unknown
+  ) {
+    super(`não foi possível desfazer: ${failed.join(", ")}`, { cause });
+    this.name = "RollbackError";
+  }
+}
 
 export type ParseResult =
   | { ok: true; capsule: Capsule }
@@ -117,10 +155,9 @@ export async function parseCapsule(text: string): Promise<ParseResult> {
     const file = f as Record<string, unknown> | null;
     if (
       !file ||
-      typeof file.kind !== "string" ||
-      !KINDS.includes(file.kind) ||
       typeof file.suffix !== "string" ||
-      !SUFFIX.test(file.suffix) ||
+      typeof file.kind !== "string" ||
+      kindOfSuffix(file.suffix) !== file.kind ||
       vistos.has(file.suffix) ||
       typeof file.size !== "number" ||
       typeof file.sha256 !== "string" ||
@@ -163,7 +200,8 @@ export function planRestore(
 ): RestoreStep[] {
   const mesmoCore = capsule.coreVersion === coreVersion;
   return capsule.files.map((file) => {
-    const preso = file.kind === "state" || file.kind === "thumbnail";
+    const kind = kindOfSuffix(file.suffix);
+    const preso = kind !== "save" && kind !== "screenshot";
     const action = preso && !mesmoCore ? "skip-core" : "write";
     return { file, action, overwrites: action === "write" && existingSuffixes.has(file.suffix) };
   });
@@ -176,9 +214,13 @@ export function capsuleFileName(romFileName: string, d: Date = new Date()): stri
 }
 
 /** Só o `localStorage` que isto usa. */
-interface StorageLike {
+interface ReadableStorage {
   getItem(key: string): string | null;
+}
+
+interface StorageLike extends ReadableStorage {
   setItem(key: string, value: string): void;
+  removeItem(key: string): void;
 }
 
 /** Os registros por ROM e a forma de cada um — os mesmos da renomeação. */
@@ -192,12 +234,23 @@ const POR_ROM: { key: string; shape: "array" | "record" }[] = [
   { key: "pokedex:map-marks", shape: "record" },
 ];
 
-/** A entrada de uma ROM em cada registro. */
-export function collectRomData(storage: StorageLike, rom: string): Record<string, unknown> {
+/**
+ * A entrada de uma ROM em cada registro. Um registro que não dá para ler vai
+ * para `problems` em vez de sumir calado da cápsula.
+ */
+export function collectRomData(
+  storage: ReadableStorage,
+  rom: string,
+  problems: string[] = []
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const { key, shape } of POR_ROM) {
     try {
       const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
+      if (parsed !== null && (typeof parsed !== "object" || (shape === "array") !== Array.isArray(parsed))) {
+        problems.push(key);
+        continue;
+      }
       const entry =
         shape === "array"
           ? Array.isArray(parsed)
@@ -208,7 +261,7 @@ export function collectRomData(storage: StorageLike, rom: string): Record<string
             : undefined;
       if (entry !== undefined) out[key] = entry;
     } catch {
-      // registro quebrado: fica de fora da cápsula
+      problems.push(key);
     }
   }
   return out;
@@ -218,39 +271,51 @@ export function collectRomData(storage: StorageLike, rom: string): Record<string
  * Põe as entradas da cápsula nos registros, sob o nome `rom`. Só toca na
  * entrada desta ROM: as outras aventuras ficam como estão.
  *
- * Se uma gravação falhar no meio, as que já foram feitas são desfeitas — a
- * restauração é tudo ou nada.
+ * Primeiro calcula tudo: um registro existente que não dá para ler recusa a
+ * operação antes de qualquer gravação, em vez de ser trocado por um novo que
+ * apagaria as outras aventuras. Se uma gravação falhar no meio, as que já
+ * foram feitas são desfeitas — chave que não existia é removida. Se desfazer
+ * também falhar, sobe um `RollbackError` dizendo quais chaves ficaram.
  */
 export function applyRomData(storage: StorageLike, rom: string, data: Record<string, unknown>): void {
-  const antes: [string, string | null][] = [];
+  const plano: { key: string; raw: string | null; next: string }[] = [];
+  for (const { key, shape } of POR_ROM) {
+    if (!(key in data)) continue;
+    const entry = data[key];
+    if (!entry || typeof entry !== "object") continue;
+    const raw = storage.getItem(key);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw ?? "null");
+    } catch {
+      throw new Error(`registro ilegível: ${key}`);
+    }
+    const lista = shape === "array" ? Array.isArray(parsed) : !!parsed && typeof parsed === "object" && !Array.isArray(parsed);
+    if (parsed !== null && !lista) throw new Error(`registro ilegível: ${key}`);
+    const nova = { ...(entry as object), rom };
+    const next =
+      shape === "array"
+        ? [...((parsed as unknown[] | null) ?? []).filter((e) => (e as { rom?: unknown } | null)?.rom !== rom), nova]
+        : { ...((parsed as object | null) ?? {}), [rom]: nova };
+    plano.push({ key, raw, next: JSON.stringify(next) });
+  }
+  const feitos: { key: string; raw: string | null }[] = [];
   try {
-    for (const { key, shape } of POR_ROM) {
-      if (!(key in data)) continue;
-      const entry = data[key];
-      if (!entry || typeof entry !== "object") continue;
-      const raw = storage.getItem(key);
-      let parsed: unknown = null;
-      try {
-        parsed = JSON.parse(raw ?? "null");
-      } catch {
-        parsed = null;
-      }
-      const nova = { ...(entry as object), rom };
-      const next =
-        shape === "array"
-          ? [...(Array.isArray(parsed) ? parsed.filter((e) => (e as { rom?: unknown } | null)?.rom !== rom) : []), nova]
-          : { ...(parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}), [rom]: nova };
-      antes.push([key, raw]);
-      storage.setItem(key, JSON.stringify(next));
+    for (const p of plano) {
+      storage.setItem(p.key, p.next);
+      feitos.push(p);
     }
   } catch (error) {
-    for (const [key, raw] of antes) {
+    const falhas: string[] = [];
+    for (const { key, raw } of feitos.reverse()) {
       try {
-        if (raw !== null) storage.setItem(key, raw);
+        if (raw === null) storage.removeItem(key);
+        else storage.setItem(key, raw);
       } catch {
-        // sem como repor: o erro original sobe do mesmo jeito
+        falhas.push(key);
       }
     }
+    if (falhas.length > 0) throw new RollbackError(falhas, error);
     throw error;
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { collectRomFiles, existingSuffixes, writeRestore, type CapsuleFs } from "./capsuleFs";
-import { capsuleFile, planRestore, type Capsule } from "../lib/capsule";
+import { capsuleFile, CapsuleIncompleteError, planRestore, RollbackError, type Capsule } from "../lib/capsule";
 
 const DIRS = { savePath: "/data/saves", saveStatePath: "/data/states", screenshotsPath: "/data/screenshots" };
 
@@ -54,6 +54,18 @@ describe("collectRomFiles", () => {
     ]);
     expect(existingSuffixes(fs, DIRS, "Emerald.gba").size).toBe(5);
   });
+
+  it("arquivo listado e ilegível derruba a coleta dizendo qual (AUD-05)", async () => {
+    const fs = fakeFs({ "/data/saves/Emerald.sav": [1], "/data/states/Emerald.ss1": [2] });
+    const ler = fs.readFile;
+    fs.readFile = (p) => {
+      if (p.endsWith(".sav")) throw new Error("falha de leitura");
+      return ler(p);
+    };
+    const coleta = collectRomFiles(fs, DIRS, "Emerald.gba");
+    await expect(coleta).rejects.toBeInstanceOf(CapsuleIncompleteError);
+    await expect(coleta).rejects.toMatchObject({ items: [".sav"] });
+  });
 });
 
 async function capsula(): Promise<Capsule> {
@@ -89,6 +101,17 @@ describe("writeRestore", () => {
     const plano = planRestore(await capsula(), existingSuffixes(fs, DIRS, "Local.gba"), "c");
     expect(() => writeRestore(fs, DIRS, "Local.gba", plano)).toThrow("cota");
     expect(estado(fs)).toEqual({ "/data/saves/Local.sav": [1] });
+  });
+
+  it("se a reserva não volta, avisa em vez de engolir (RollbackError)", async () => {
+    const fs = fakeFs({ "/data/saves/Local.sav": [1] }, "/data/states/Local.ss1");
+    const renomear = fs.rename;
+    fs.rename = (a, b) => {
+      if (a.endsWith(".antes-da-capsula")) throw new Error("travado");
+      renomear(a, b);
+    };
+    const plano = planRestore(await capsula(), existingSuffixes(fs, DIRS, "Local.gba"), "c");
+    expect(() => writeRestore(fs, DIRS, "Local.gba", plano)).toThrow(RollbackError);
   });
 
   it("ponto de retorno de outro core não é gravado", async () => {

@@ -1,7 +1,10 @@
 import { romBaseName } from "./saveStates";
 import {
   capsuleFile,
+  CapsuleIncompleteError,
   fromBase64,
+  RollbackError,
+  SUFFIX_KINDS,
   type CapsuleFile,
   type CapsuleFileKind,
   type RestoreStep,
@@ -26,13 +29,15 @@ export interface CapsuleDirs {
   screenshotsPath: string;
 }
 
-/** Sufixo -> tipo e diretório. A ordem importa: `.ssN.png` antes de `.ssN`. */
-const TIPOS: { re: RegExp; kind: CapsuleFileKind; dir: keyof CapsuleDirs }[] = [
-  { re: /^\.sav$/, kind: "save", dir: "savePath" },
-  { re: /^\.ss\d\.png$/, kind: "thumbnail", dir: "screenshotsPath" },
-  { re: /^-\d{8}-\d{6}\.png$/, kind: "screenshot", dir: "screenshotsPath" },
-  { re: /^(\.ss\d|_auto\.ss)$/, kind: "state", dir: "saveStatePath" },
-];
+/** Onde o core guarda cada tipo. O tipo vem da tabela única de `capsule.ts`. */
+const DIR_DE: Record<CapsuleFileKind, keyof CapsuleDirs> = {
+  save: "savePath",
+  thumbnail: "screenshotsPath",
+  screenshot: "screenshotsPath",
+  state: "saveStatePath",
+};
+
+const TIPOS = SUFFIX_KINDS.map((t) => ({ ...t, dir: DIR_DE[t.kind] }));
 
 const tipoDe = (suffix: string) => TIPOS.find((t) => t.re.test(suffix));
 
@@ -56,11 +61,16 @@ export function existingSuffixes(fs: CapsuleFs, dirs: CapsuleDirs, rom: string):
   return out;
 }
 
-/** Lê do FS todos os arquivos de uma ROM, já com tamanho e hash. */
+/**
+ * Lê do FS todos os arquivos de uma ROM, já com tamanho e hash. Um arquivo
+ * listado que não dá para ler derruba a coleta com `CapsuleIncompleteError`:
+ * uma cápsula sem o save não pode sair parecendo completa.
+ */
 export async function collectRomFiles(fs: CapsuleFs, dirs: CapsuleDirs, rom: string): Promise<CapsuleFile[]> {
   const base = romBaseName(rom);
   const out: CapsuleFile[] = [];
   const vistos = new Set<string>();
+  const falhas: string[] = [];
   for (const t of TIPOS) {
     for (const suffix of sufixosEm(fs, dirs[t.dir], base)) {
       if (!t.re.test(suffix) || vistos.has(suffix)) continue;
@@ -68,10 +78,11 @@ export async function collectRomFiles(fs: CapsuleFs, dirs: CapsuleDirs, rom: str
       try {
         out.push(await capsuleFile(t.kind, suffix, fs.readFile(`${dirs[t.dir]}/${base}${suffix}`)));
       } catch {
-        // arquivo ilegível: a cápsula sai sem ele
+        falhas.push(suffix);
       }
     }
   }
+  if (falhas.length > 0) throw new CapsuleIncompleteError(falhas);
   return out;
 }
 
@@ -125,11 +136,12 @@ export function writeRestore(
       escritos.push(path);
     }
   } catch (error) {
+    const falhas: string[] = [];
     for (const path of escritos) {
       try {
         fs.unlink(path);
       } catch {
-        // não chegou a existir
+        falhas.push(path);
       }
     }
     for (const path of reservas) {
@@ -137,8 +149,10 @@ export function writeRestore(
         fs.rename(path + BAK, path);
       } catch {
         // a reserva continua lá, com o nome de reserva
+        falhas.push(path);
       }
     }
+    if (falhas.length > 0) throw new RollbackError(falhas, error);
     throw error;
   }
   for (const path of reservas) {
